@@ -1,0 +1,78 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply m-0 p-0 box-border;
+  }
+
+  body {
+    @apply bg-spotify-dark-gray text-spotify-white overflow-hidden;
+    font-family: 'Circular Std', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  button {
+    @apply cursor-pointer border-none bg-transparent;
+    font-family: inherit;
+  }
+
+  a {
+    @apply text-inherit no-underline;
+  }
+}
+
+@layer utilities {
+  /* Custom scrollbar - Spotify style */
+  .scrollbar-spotify {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+  }
+
+  .scrollbar-spotify::-webkit-scrollbar {
+    @apply w-3;
+  }
+
+  .scrollbar-spotify::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  .scrollbar-spotify::-webkit-scrollbar-thumb {
+    @apply bg-white/20 rounded-lg;
+  }
+
+  .scrollbar-spotify::-webkit-scrollbar-thumb:hover {
+    @apply bg-white/30;
+  }
+
+  /* Line clamp utilities */
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* Smooth transitions */
+  * {
+    @apply transition-colors duration-200;
+  }
+}
+
+/* Custom animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out;
+}
