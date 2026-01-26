@@ -274,10 +274,22 @@ def stream(video_id: str):
     logger.info(f"Streaming: {video_id}")
     try:
         stream_info = extract_audio_url(video_id)
-        if not stream_info.get('url'):
+        url = stream_info.get('url')
+        if not url:
             raise HTTPException(status_code=500, detail="No audio stream found")
         
-        return RedirectResponse(url=stream_info['url'], status_code=302)
+        # Proxy the stream using requests and StreamingResponse
+        # This ensures the request to Google comes from the Backend IP
+        def iterfile():
+            try:
+                with requests.get(url, stream=True, timeout=10) as r:
+                    r.raise_for_status()
+                    for chunk in r.iter_content(chunk_size=64*1024): # 64k chunks
+                        yield chunk
+            except Exception as e:
+                logger.error(f"Streaming connection failed: {e}")
+
+        return StreamingResponse(iterfile(), media_type="audio/mp4")
     except HTTPException:
         raise
     except Exception as e:
