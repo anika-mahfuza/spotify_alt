@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from pydantic import BaseModel
@@ -11,6 +11,7 @@ from spotipy.oauth2 import SpotifyOAuth
 import os
 import json
 import time
+import httpx
 from typing import Dict, Any
 from dotenv import load_dotenv
 
@@ -235,20 +236,27 @@ def search(q: str = Query(..., min_length=1)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/search-and-play")
-def search_and_play(q: str = Query(..., min_length=1)):
-    """Search and return first playable result"""
+def search_and_play(request: Request, q: str = Query(..., min_length=1)):
+    """Search and return first playable result with proxied stream URL"""
     try:
         results = search_youtube(q, limit=1)
         if not results:
             raise HTTPException(status_code=404, detail="No results found")
         
         video = results[0]
-        stream_info = extract_audio_url(video['id'])
+        video_id = video['id']
+        
+        # Pre-cache the stream URL to make playback faster
+        stream_info = extract_audio_url(video_id)
+        
+        # Return the proxied stream URL instead of direct YouTube URL
+        base = os.getenv("PUBLIC_API_URL", str(request.base_url).rstrip("/"))
+        proxied_url = f"{base}/stream/{video_id}"
         
         return {
-            "id": video['id'],
+            "id": video_id,
             "title": stream_info.get('title') or video['title'],
-            "url": stream_info['url'],
+            "url": proxied_url,  # Changed: Return proxied URL instead of direct YouTube URL
             "thumbnail": stream_info.get('thumbnail') or video['thumbnail'],
             "uploader": stream_info.get('uploader') or video['uploader']
         }
