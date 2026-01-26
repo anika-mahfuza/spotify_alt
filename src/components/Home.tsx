@@ -625,7 +625,7 @@ export function Home({ activePlaylistId, activeAlbumId, activeArtistId, onTrackS
     }, [activePlaylistId, activeAlbumId, activeArtistId]);
 
     return (
-        <div className="flex-1 overflow-y-auto pb-24">
+        <div className="flex-1 overflow-y-auto pb-[calc(6rem+env(safe-area-inset-bottom))]">
             {!activePlaylistId && !activeAlbumId && !activeArtistId && !loading && (
                 <div className="min-h-full">
                     <div className="px-6 pt-6 pb-5">

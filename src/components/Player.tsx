@@ -337,8 +337,11 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                     flex flex-col justify-end pb-0
                     bg-black/95 backdrop-blur-xl
                 "
+                style={{
+                    height: 'calc(5rem + env(safe-area-inset-bottom))',
+                    paddingBottom: 'env(safe-area-inset-bottom)',
+                }}
             >
-            {/* Gradient overlay - simplified */}
             <div
                 className="absolute inset-0 opacity-20 pointer-events-none"
                 style={{
@@ -346,7 +349,6 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                 }}
             />
 
-            {/* Progress Bar for Mobile (Top Edge of Player) */}
             <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/10 md:hidden z-20">
                  <div 
                     className="h-full bg-white transition-all duration-300"
@@ -391,10 +393,8 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                     )}
                 </div>
 
-                {/* Controls - Mobile: Right Aligned, Desktop: Centered */}
                 <div className="flex flex-col items-center justify-center md:flex-1 md:w-[40%] md:max-w-[600px]">
                     <div className="flex items-center gap-4 md:gap-6">
-                        {/* Desktop Controls */}
                         <button
                             onClick={toggleShuffle}
                             className={`hidden md:block transition-all duration-150 ${isShuffle ? 'text-[#1DB954]' : 'text-white/70 hover:text-white'}`}
@@ -406,18 +406,17 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
 
                         <button
                             onClick={onPrev}
-                            className="hidden md:block transition-all hover:scale-105 text-white/70 hover:text-white"
+                            className="transition-all hover:scale-105 text-white/70 hover:text-white"
                             disabled={isLoading}
                             title="Previous"
                         >
                             <SkipBack size={20} fill="currentColor" strokeWidth={0} />
                         </button>
 
-                        {/* Play/Pause - Visible on All */}
                         <button
                             onClick={togglePlay}
                             className="
-                                w-10 h-10 md:w-8 md:h-8 bg-white rounded-full
+                                w-12 h-12 md:w-8 md:h-8 bg-white rounded-full
                                 flex items-center justify-center
                                 transition-all hover:scale-105 active:scale-95
                                 text-black shadow-lg
@@ -435,10 +434,9 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                             )}
                         </button>
 
-                        {/* Next - Visible on Mobile too now */}
                         <button
                             onClick={onNext}
-                            className="md:block transition-all hover:scale-105 text-white/70 hover:text-white"
+                            className="transition-all hover:scale-105 text-white/70 hover:text-white"
                             disabled={isLoading}
                             title="Next"
                         >
@@ -447,7 +445,7 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
 
                         <button
                             onClick={toggleRepeat}
-                            className={`hidden md:block transition-all duration-150 relative hover:scale-105 ${repeatMode > 0 ? 'text-primary' : 'text-white/70 hover:text-white'}`}
+                            className={`transition-all duration-150 relative hover:scale-105 ${repeatMode > 0 ? 'text-primary' : 'text-white/70 hover:text-white'}`}
                             disabled={isLoading}
                             title={repeatMode === 0 ? "Repeat" : repeatMode === 1 ? "Repeat All" : "Repeat One"}
                         >

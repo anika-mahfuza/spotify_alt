@@ -5,7 +5,7 @@ export const useSpotifyFetch = () => {
     const { getAccessToken, logout } = useAuth();
 
     const fetchWithAuth = useCallback(async (input: RequestInfo | URL, init?: RequestInit) => {
-        let token = await getAccessToken();
+        const token = await getAccessToken();
 
         if (!token) {
             // No token available, and refresh failed or not possible
@@ -16,7 +16,7 @@ export const useSpotifyFetch = () => {
         // If the URL is absolute and matches our backend API, append the token
         // If it's a Spotify API call, add Authorization header
         let url = input.toString();
-        let headers = new Headers(init?.headers);
+        const headers = new Headers(init?.headers);
 
         if (url.includes('api.spotify.com')) {
             headers.set('Authorization', `Bearer ${token}`);
