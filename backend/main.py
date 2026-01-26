@@ -75,7 +75,6 @@ cache = MemoryCache()
 CLIENT_ID = os.getenv("SPOTIPY_CLIENT_ID")
 CLIENT_SECRET = os.getenv("SPOTIPY_CLIENT_SECRET")
 REDIRECT_URI = os.getenv("SPOTIPY_REDIRECT_URI")
-# Require FRONTEND_URL to be set in production, or fallback to the known production URL
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://217.154.114.227:11700")
 SCOPE = "user-library-read playlist-read-private user-read-private user-read-email streaming user-read-recently-played user-top-read"
 
@@ -88,7 +87,7 @@ sp_oauth = SpotifyOAuth(
     redirect_uri=REDIRECT_URI,
     scope=SCOPE,
     cache_handler=spotipy.cache_handler.MemoryCacheHandler(),
-    show_dialog=True  # Force account selection dialog
+    show_dialog=True
 )
 
 # --- YT-DLP Options ---
@@ -141,7 +140,7 @@ def extract_audio_url(video_id: str) -> dict:
         }
         
         if result["url"]:
-            cache.set(cache_key, json.dumps(result), ttl=600)
+            cache.set(cache_key, json.dumps(result), ttl=3600)  # 1 hour cache
         
         return result
 
@@ -181,10 +180,7 @@ def health():
 # --- Spotify Auth ---
 @app.get("/login")
 def login(frontend_url: str | None = None):
-    # Force account selection by adding show_dialog parameter
-    # Use 'state' parameter to pass the frontend_url through Spotify auth flow
     auth_url = sp_oauth.get_authorize_url(state=frontend_url)
-    # Ensure show_dialog=true is in the URL
     if 'show_dialog' not in auth_url:
         separator = '&' if '?' in auth_url else '?'
         auth_url = f"{auth_url}{separator}show_dialog=true"
@@ -193,7 +189,6 @@ def login(frontend_url: str | None = None):
 @app.get("/callback")
 def callback(code: str, state: str | None = None):
     try:
-        # Avoid DeprecationWarning by requesting string token but retrieving full info from cache
         sp_oauth.get_access_token(code, as_dict=False)
         token_info = sp_oauth.get_cached_token()
         
@@ -201,8 +196,6 @@ def callback(code: str, state: str | None = None):
         refresh_token = token_info.get('refresh_token')
         expires_in = token_info.get('expires_in')
         
-        # HARDCODED FIX: Always redirect to the Cloudflare Pages frontend
-        # This ensures we don't get stuck on the Worker URL or Wispbyte IP
         frontend_redirect_url = "https://spotify-alt.pages.dev"
             
         return RedirectResponse(
@@ -237,7 +230,7 @@ def search(q: str = Query(..., min_length=1)):
 
 @app.get("/search-and-play")
 def search_and_play(request: Request, q: str = Query(..., min_length=1)):
-    """Search and return first playable result with proxied stream URL"""
+    """Search and return first playable result - OPTIMIZED (no blocking)"""
     try:
         results = search_youtube(q, limit=1)
         if not results:
@@ -246,19 +239,16 @@ def search_and_play(request: Request, q: str = Query(..., min_length=1)):
         video = results[0]
         video_id = video['id']
         
-        # Pre-cache the stream URL to make playback faster
-        stream_info = extract_audio_url(video_id)
-        
-        # Return the proxied stream URL instead of direct YouTube URL
+        # Return immediately - /stream will handle extraction (saves 3-5 seconds!)
         base = os.getenv("PUBLIC_API_URL", str(request.base_url).rstrip("/"))
         proxied_url = f"{base}/stream/{video_id}"
         
         return {
             "id": video_id,
-            "title": stream_info.get('title') or video['title'],
-            "url": proxied_url,  # Changed: Return proxied URL instead of direct YouTube URL
-            "thumbnail": stream_info.get('thumbnail') or video['thumbnail'],
-            "uploader": stream_info.get('uploader') or video['uploader']
+            "title": video['title'],
+            "url": proxied_url,
+            "thumbnail": video['thumbnail'],
+            "uploader": video['uploader']
         }
     except HTTPException:
         raise
@@ -268,26 +258,24 @@ def search_and_play(request: Request, q: str = Query(..., min_length=1)):
 @app.get("/play/{video_id}")
 def play(request: Request, video_id: str):
     """Get stream URL for video ID"""
-    # Use PUBLIC_API_URL if set (for proxy setups), otherwise use request base
     base = os.getenv("PUBLIC_API_URL", str(request.base_url).rstrip("/"))
     return {"url": f"{base}/stream/{video_id}", "id": video_id}
 
 @app.get("/stream/{video_id}")
 async def stream(video_id: str):
-    """Stream audio from YouTube video"""
+    """Stream audio from YouTube video - handles extraction here"""
     try:
         stream_info = extract_audio_url(video_id)
         url = stream_info.get('url')
         if not url:
             raise HTTPException(status_code=500, detail="No audio stream found")
         
-        # Async Proxy using httpx
-        # Using a generator to stream chunks as they arrive
+        # Stream with larger chunks for better performance
         async def iterfile():
-            async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
+            async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
                 async with client.stream("GET", url) as r:
                     r.raise_for_status()
-                    async for chunk in r.aiter_bytes(chunk_size=128*1024): # 128KB chunks
+                    async for chunk in r.aiter_bytes(chunk_size=256*1024):  # 256KB chunks
                         yield chunk
 
         return StreamingResponse(iterfile(), media_type="audio/mp4")
