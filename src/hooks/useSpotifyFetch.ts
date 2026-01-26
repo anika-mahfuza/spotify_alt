@@ -30,32 +30,45 @@ export const useSpotifyFetch = () => {
             }
         }
 
-        let response = await fetch(url, { ...init, headers });
+        // Create AbortController for timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+        const signal = init?.signal || controller.signal;
 
-        // If we get a 401, it might be because the token expired *just now*
-        // or the check in getAccessToken wasn't sufficient (e.g. clock skew)
-        if (response.status === 401) {
-            // Try to force refresh the token by calling getAccessToken again
-            // (Note: getAccessToken implementation currently relies on local state, 
-            // so we might need to modify it to force refresh if needed, but for now 
-            // let's assume calling it again might pick up a new token if another request refreshed it,
-            // or we could add a forceRefresh param to getAccessToken)
-            
-            // For now, let's just retry once if we think we can get a valid token
-            const newToken = await getAccessToken();
-            if (newToken && newToken !== token) {
-                 if (url.includes('api.spotify.com')) {
-                    headers.set('Authorization', `Bearer ${newToken}`);
-                } else {
-                    const urlObj = new URL(url, window.location.origin);
-                    urlObj.searchParams.set('token', newToken);
-                    url = urlObj.toString();
+        try {
+            let response = await fetch(url, { ...init, headers, signal });
+            clearTimeout(timeoutId);
+
+            // If we get a 401, it might be because the token expired *just now*
+            // or the check in getAccessToken wasn't sufficient (e.g. clock skew)
+            if (response.status === 401) {
+                // Try to force refresh the token by calling getAccessToken again
+                const newToken = await getAccessToken();
+                if (newToken && newToken !== token) {
+                     if (url.includes('api.spotify.com')) {
+                        headers.set('Authorization', `Bearer ${newToken}`);
+                    } else {
+                        const urlObj = new URL(url, window.location.origin);
+                        urlObj.searchParams.set('token', newToken);
+                        url = urlObj.toString();
+                    }
+                    
+                    // Retry with new token (and new timeout)
+                    const retryController = new AbortController();
+                    const retryTimeoutId = setTimeout(() => retryController.abort(), 15000);
+                    try {
+                        response = await fetch(url, { ...init, headers, signal: retryController.signal });
+                    } finally {
+                        clearTimeout(retryTimeoutId);
+                    }
                 }
-                response = await fetch(url, { ...init, headers });
             }
-        }
 
-        return response;
+            return response;
+        } catch (error) {
+            clearTimeout(timeoutId);
+            throw error;
+        }
     }, [getAccessToken, logout]);
 
     return fetchWithAuth;

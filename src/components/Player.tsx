@@ -315,6 +315,8 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
     const toggleShuffle = () => setIsShuffle(!isShuffle);
     const toggleRepeat = () => setRepeatMode((repeatMode + 1) % 3);
 
+    if (!currentTrack) return null;
+
     return (
         <>
             {/* Hidden audio element */}

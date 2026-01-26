@@ -207,6 +207,7 @@ export function Home({ activePlaylistId, activeAlbumId, activeArtistId, onTrackS
     const [artistAlbums, setArtistAlbums] = useState<Album[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [retryTrigger, setRetryTrigger] = useState(0);
     const [hoveredTrack, setHoveredTrack] = useState<string | null>(null);
     const [playlistSearchQuery, setPlaylistSearchQuery] = useState('');
     const [isSearchExpanded, setIsSearchExpanded] = useState(false);
@@ -376,6 +377,7 @@ export function Home({ activePlaylistId, activeAlbumId, activeArtistId, onTrackS
 
                 } catch (err) {
                     console.error("Dashboard fetch error", err);
+                    setError('Failed to load dashboard data. Please check your internet connection or try again later.');
                 } finally {
                     setLoading(false);
                 }
@@ -383,7 +385,7 @@ export function Home({ activePlaylistId, activeAlbumId, activeArtistId, onTrackS
 
             fetchDashboard();
         }
-    }, [activePlaylistId, activeAlbumId, token, fetchWithAuth]);
+    }, [activePlaylistId, activeAlbumId, token, fetchWithAuth, retryTrigger]);
 
     useEffect(() => {
         if ((activePlaylistId || activeAlbumId || activeArtistId) && token) {
@@ -838,8 +840,14 @@ export function Home({ activePlaylistId, activeAlbumId, activeArtistId, onTrackS
             )}
 
             {error && (
-                <div className="mx-6 my-4 bg-accent-pink/20 text-accent-pink p-3 rounded-md text-sm font-medium">
-                    {error}
+                <div className="mx-6 my-4 bg-accent-pink/20 text-accent-pink p-4 rounded-md text-sm font-medium flex flex-col items-start gap-3">
+                    <p>{error}</p>
+                    <button 
+                        onClick={() => setRetryTrigger(prev => prev + 1)}
+                        className="px-4 py-2 bg-accent-pink text-white rounded hover:bg-accent-pink/90 transition-colors font-bold"
+                    >
+                        Retry
+                    </button>
                 </div>
             )}
 
