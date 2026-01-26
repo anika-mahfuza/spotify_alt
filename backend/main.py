@@ -12,6 +12,7 @@ import os
 import json
 import time
 import httpx
+import asyncio
 from typing import Dict, Any
 from dotenv import load_dotenv
 
@@ -96,6 +97,13 @@ YTDL_OPTS = {
     'noplaylist': True,
     'quiet': True,
     'no_warnings': True,
+    'no_check_certificates': True,
+    'http_headers': {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-us,en;q=0.5',
+        'Sec-Fetch-Mode': 'navigate',
+    }
 }
 
 YTDL_SEARCH_OPTS = {
@@ -263,26 +271,81 @@ def play(request: Request, video_id: str):
 
 @app.get("/stream/{video_id}")
 async def stream(video_id: str):
-    """Stream audio from YouTube video - handles extraction here"""
+    """Stream audio from YouTube video - handles extraction and retries on failure"""
     try:
+        # Try to get cached URL first
         stream_info = extract_audio_url(video_id)
         url = stream_info.get('url')
+        
         if not url:
+            logger.error(f"No URL found for video {video_id}")
             raise HTTPException(status_code=500, detail="No audio stream found")
         
-        # Optimized streaming with moderate chunks
+        # Stream with proper headers to avoid YouTube blocking
         async def iterfile():
-            async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
-                async with client.stream("GET", url) as r:
-                    r.raise_for_status()
-                    async for chunk in r.aiter_bytes(chunk_size=128*1024):  # 128KB chunks - good balance
-                        yield chunk
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': '*/*',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Referer': 'https://www.youtube.com/',
+                'Origin': 'https://www.youtube.com',
+                'Sec-Fetch-Dest': 'audio',
+                'Sec-Fetch-Mode': 'no-cors',
+                'Sec-Fetch-Site': 'cross-site',
+            }
+            
+            retry_count = 0
+            max_retries = 2
+            current_url = url
+            
+            while retry_count <= max_retries:
+                try:
+                    async with httpx.AsyncClient(timeout=20.0, follow_redirects=True, headers=headers) as client:
+                        async with client.stream("GET", current_url) as r:
+                            if r.status_code == 403:
+                                logger.warning(f"YouTube 403 error for {video_id}, attempt {retry_count + 1}/{max_retries + 1}")
+                                
+                                if retry_count < max_retries:
+                                    # URL expired or blocked - re-extract
+                                    logger.info(f"Re-extracting URL for {video_id}")
+                                    cache.delete(f"stream:{video_id}")  # Clear cache
+                                    fresh_info = extract_audio_url(video_id)
+                                    current_url = fresh_info.get('url')
+                                    
+                                    if not current_url:
+                                        raise HTTPException(status_code=500, detail="Failed to get fresh URL")
+                                    
+                                    retry_count += 1
+                                    continue  # Retry with new URL
+                                else:
+                                    raise HTTPException(status_code=403, detail="YouTube blocked the request")
+                            
+                            r.raise_for_status()
+                            
+                            # Success - stream the audio
+                            async for chunk in r.aiter_bytes(chunk_size=128*1024):
+                                yield chunk
+                            
+                            break  # Success, exit loop
+                            
+                except httpx.HTTPStatusError as e:
+                    if e.response.status_code == 403 and retry_count < max_retries:
+                        retry_count += 1
+                        logger.warning(f"Retry {retry_count} for {video_id} due to 403")
+                        await asyncio.sleep(1)  # Wait before retry
+                        continue
+                    raise
+                except Exception as e:
+                    logger.error(f"Stream error for {video_id}: {str(e)}")
+                    raise
 
         return StreamingResponse(iterfile(), media_type="audio/mp4")
+        
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Fatal stream error for {video_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Stream error: {str(e)}")
 
 # --- Spotify Endpoints ---
 @app.get("/playlists")
