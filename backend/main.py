@@ -37,7 +37,7 @@ load_dotenv()
 
 # --- Simple Memory Cache ---
 class MemoryCache:
-    def __init__(self, max_size: int = 50):
+    def __init__(self, max_size: int = 100):  # Increased: plenty of RAM available
         self.cache: Dict[str, Dict[str, Any]] = {}
         self.max_size = max_size
     
@@ -140,7 +140,7 @@ def extract_audio_url(video_id: str) -> dict:
         }
         
         if result["url"]:
-            cache.set(cache_key, json.dumps(result), ttl=3600)  # 1 hour cache
+            cache.set(cache_key, json.dumps(result), ttl=3600)  # 1 hour - fast repeated plays
         
         return result
 
@@ -270,12 +270,12 @@ async def stream(video_id: str):
         if not url:
             raise HTTPException(status_code=500, detail="No audio stream found")
         
-        # Stream with larger chunks for better performance
+        # Optimized streaming with moderate chunks
         async def iterfile():
-            async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+            async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
                 async with client.stream("GET", url) as r:
                     r.raise_for_status()
-                    async for chunk in r.aiter_bytes(chunk_size=256*1024):  # 256KB chunks
+                    async for chunk in r.aiter_bytes(chunk_size=128*1024):  # 128KB chunks - good balance
                         yield chunk
 
         return StreamingResponse(iterfile(), media_type="audio/mp4")
@@ -617,12 +617,15 @@ def get_followed_artists(token: str):
 if __name__ == "__main__":
     port = int(os.environ.get("SERVER_PORT", os.environ.get("PORT", 11700)))
     
+    # OPTIMIZED FOR SPEED (512MB RAM, plenty available per stats)
     uvicorn.run(
         app,
         host="0.0.0.0",
         port=port,
         workers=1,
-        limit_concurrency=50,  # Increased from 10 to handle multiple simultaneous requests
-        timeout_keep_alive=30,  # Increased from 5 for slower connections
+        limit_concurrency=35,  # Increased: you have plenty of RAM (82% free!)
+        limit_max_requests=2000,  # Memory cleanup every 2000 requests
+        timeout_keep_alive=15,  # Balance between speed and memory
+        backlog=100,  # Queue for burst traffic
         access_log=False
     )
