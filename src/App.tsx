@@ -33,29 +33,29 @@ function Login() {
   return (
     <div className="min-h-screen w-full text-white flex flex-col relative z-50" style={{ backgroundColor: '#000000' }}>
       {/* Navigation */}
-      <nav className="w-full px-8 py-6 flex items-center justify-between">
+      <nav className="w-full px-4 md:px-8 py-4 md:py-6 flex items-center justify-between">
         <div className="flex items-center gap-2">
            <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center">
              <Music size={16} className="text-black" strokeWidth={3} />
            </div>
-           <span className="text-xl font-bold tracking-tight">Spotify Alt</span>
+           <span className="text-lg md:text-xl font-bold tracking-tight">Spotify Alt</span>
         </div>
-        <div className="flex items-center gap-6 text-sm font-medium text-zinc-400">
-           <a href="#" className="hover:text-white transition-colors">Premium</a>
-           <a href="#" className="hover:text-white transition-colors">Support</a>
-           <a href="#" className="hover:text-white transition-colors">Download</a>
-           <div className="w-px h-4 bg-zinc-800"></div>
-           <a href="#" className="hover:text-white transition-colors">Sign up</a>
+        <div className="flex items-center gap-4 md:gap-6 text-sm font-medium text-zinc-400">
+           <a href="#" className="hidden md:block hover:text-white transition-colors">Premium</a>
+           <a href="#" className="hidden md:block hover:text-white transition-colors">Support</a>
+           <a href="#" className="hidden md:block hover:text-white transition-colors">Download</a>
+           <div className="hidden md:block w-px h-4 bg-zinc-800"></div>
+           <a href="#" className="hidden md:block hover:text-white transition-colors">Sign up</a>
            <button onClick={login} className="hover:text-white transition-colors">Log in</button>
         </div>
       </nav>
 
       {/* Hero Section */}
       <main className="flex-1 flex flex-col items-center justify-center text-center px-4 relative z-10 pb-20">
-        <h1 className="text-5xl md:text-7xl font-bold tracking-tighter mb-6 max-w-4xl leading-tight">
+        <h1 className="text-4xl md:text-7xl font-bold tracking-tighter mb-6 max-w-4xl leading-tight">
            Music for everyone.
         </h1>
-        <p className="text-xl text-zinc-400 mb-10 max-w-2xl font-medium">
+        <p className="text-lg md:text-xl text-zinc-400 mb-10 max-w-2xl font-medium">
            Millions of songs. No credit card needed.
         </p>
 
@@ -333,7 +333,7 @@ function MainContent({
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden relative z-10">
       {/* Search Bar Header */}
-      <div className="sticky top-0 z-20 px-6 py-4 border-b border-white/5">
+      <div className="sticky top-0 z-20 px-6 py-4 border-b border-white/5 bg-black/95 backdrop-blur-md">
         <SearchBar
           value={searchQuery}
           onChange={(val) => {
@@ -351,7 +351,7 @@ function MainContent({
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 overflow-y-auto scrollbar-thin">
+      <div className="flex-1 overflow-y-auto scrollbar-thin pb-24 md:pb-32">
         {showSearchResults ? (
           <div className="px-8 py-6 animate-fadeIn">
             <div className="flex items-center justify-between mb-8">

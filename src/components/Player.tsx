@@ -329,27 +329,23 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
             
             <div
                 className="
-                    fixed bottom-0 left-0 right-0 h-16 md:h-24
+                    fixed bottom-0 left-0 right-0 h-20 md:h-24
                     border-t border-white/5
                     z-[100]
                     flex flex-col justify-end pb-0
+                    bg-black/95 backdrop-blur-xl
                 "
             >
-            {/* Glass effect container */}
-            <div
-                className="absolute inset-0 backdrop-blur-3xl transition-colors duration-700 bg-black/20"
-            />
-
             {/* Gradient overlay - simplified */}
             <div
-                className="absolute inset-0 opacity-20"
+                className="absolute inset-0 opacity-20 pointer-events-none"
                 style={{
                     background: `linear-gradient(to top, #000000, transparent)`,
                 }}
             />
 
-            {/* Progress Bar for Mobile (Bottom Edge) */}
-            <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-white/20 md:hidden z-20">
+            {/* Progress Bar for Mobile (Top Edge of Player) */}
+            <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/10 md:hidden z-20">
                  <div 
                     className="h-full bg-white transition-all duration-300"
                     style={{ width: `${progress}%` }}
@@ -357,7 +353,7 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
             </div>
 
             <div
-                className={`relative z-10 flex items-center justify-between h-full px-3 md:px-6 transition-all duration-300`}
+                className={`relative z-10 flex items-center justify-between h-full px-4 md:px-6 transition-all duration-300`}
                 style={{
                     paddingRight: isSidebarOpen && isLargeScreen ? `${sidebarWidth + 24}px` : undefined
                 }}
@@ -369,11 +365,11 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                             <div className="relative group/img flex-shrink-0">
                                 <img
                                     src={currentTrack.image || currentTrack.thumbnail || 'https://via.placeholder.com/56'}
-                                    className="h-10 w-10 md:h-14 md:w-14 object-cover rounded shadow-card"
+                                    className="h-12 w-12 md:h-14 md:w-14 object-cover rounded shadow-card"
                                     alt="Cover"
                                 />
                             </div>
-                            <div className="flex flex-col justify-center overflow-hidden min-w-0">
+                            <div className="flex flex-col justify-center overflow-hidden min-w-0 mr-2">
                                 <span
                                     className="text-sm font-medium truncate hover:underline cursor-pointer text-white"
                                 >
@@ -394,8 +390,8 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                 </div>
 
                 {/* Controls - Mobile: Right Aligned, Desktop: Centered */}
-                <div className="flex flex-col items-center w-auto flex-none md:flex-1 md:w-[40%] md:max-w-[600px]">
-                    <div className="flex items-center gap-4 mb-1">
+                <div className="flex flex-col items-center justify-center md:flex-1 md:w-[40%] md:max-w-[600px]">
+                    <div className="flex items-center gap-4 md:gap-6">
                         {/* Desktop Controls */}
                         <button
                             onClick={toggleShuffle}
@@ -419,36 +415,33 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                         <button
                             onClick={togglePlay}
                             className="
-                                w-8 h-8 md:w-8 md:h-8 bg-white rounded-full
+                                w-10 h-10 md:w-8 md:h-8 bg-white rounded-full
                                 flex items-center justify-center
                                 transition-all hover:scale-105 active:scale-95
-                                text-black
+                                text-black shadow-lg
                                 disabled:opacity-50 disabled:cursor-not-allowed
                             "
                             disabled={isLoading || !currentTrack}
                             title={isPlaying ? "Pause" : "Play"}
                         >
                             {isLoading ? (
-                                <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                                <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
                             ) : isPlaying ? (
-                                <Pause size={16} fill="currentColor" strokeWidth={0} />
+                                <Pause size={20} fill="currentColor" strokeWidth={0} />
                             ) : (
-                                <Play size={16} fill="currentColor" strokeWidth={0} className="ml-0.5" />
+                                <Play size={20} fill="currentColor" strokeWidth={0} className="ml-0.5" />
                             )}
                         </button>
 
-                        {/* Next - Hidden on mobile if space is tight, or visible? Let's hide to keep it minimal as requested */}
+                        {/* Next - Visible on Mobile too now */}
                         <button
                             onClick={onNext}
-                            className="hidden md:block transition-all hover:scale-105 text-white/70 hover:text-white"
+                            className="md:block transition-all hover:scale-105 text-white/70 hover:text-white"
                             disabled={isLoading}
                             title="Next"
                         >
-                            <SkipForward size={20} fill="currentColor" strokeWidth={0} />
+                            <SkipForward size={24} fill="currentColor" strokeWidth={0} className="md:w-5 md:h-5" />
                         </button>
-
-                         {/* Mobile Next Button (Optional) - Uncomment if user wants it, but mini player usually has just Play/Pause or Play/Next */}
-                         {/* We'll keep it simple for now as per 'useless layout' complaint */}
 
                         <button
                             onClick={toggleRepeat}
