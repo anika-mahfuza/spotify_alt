@@ -200,13 +200,12 @@ def callback(code: str, state: str | None = None):
         refresh_token = token_info.get('refresh_token')
         expires_in = token_info.get('expires_in')
         
-        # Determine redirect URL: use state (if valid) or fallback to env var
-        redirect_base = FRONTEND_URL
-        if state and (state.startswith("http://") or state.startswith("https://")):
-            redirect_base = state.rstrip("/")
+        # HARDCODED FIX: Always redirect to the Cloudflare Pages frontend
+        # This ensures we don't get stuck on the Worker URL or Wispbyte IP
+        frontend_redirect_url = "https://spotify-alt.pages.dev"
             
         return RedirectResponse(
-            f"{redirect_base}/?token={access_token}&refresh_token={refresh_token}&expires_in={expires_in}"
+            f"{frontend_redirect_url}/?token={access_token}&refresh_token={refresh_token}&expires_in={expires_in}"
         )
     except Exception as e:
         logger.error(f"Auth error: {e}")
