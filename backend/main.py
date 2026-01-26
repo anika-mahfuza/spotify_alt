@@ -444,6 +444,16 @@ def get_made_for_you(token: str):
     except Exception as e:
         return []
 
+@app.get("/featured-playlists")
+def get_featured_playlists(token: str):
+    """Get Spotify featured playlists"""
+    try:
+        sp = spotipy.Spotify(auth=token)
+        results = sp.featured_playlists(limit=20)
+        return results.get('playlists', {}).get('items', [])
+    except Exception as e:
+        return []
+
 @app.get("/top-tracks")
 def get_top_tracks(token: str):
     """Get user's top tracks"""
@@ -612,7 +622,7 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=port,
         workers=1,
-        limit_concurrency=10,
-        timeout_keep_alive=5,
+        limit_concurrency=50,  # Increased from 10 to handle multiple simultaneous requests
+        timeout_keep_alive=30,  # Increased from 5 for slower connections
         access_log=False
     )

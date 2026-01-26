@@ -983,7 +983,7 @@ export function Home({ activePlaylistId, activeAlbumId, activeArtistId, onTrackS
                                     {displayedTracks.map((track, index) => (
                                         <div
                                             key={`${track.id}-${index}`}
-                                            className={`grid grid-cols-[16px_4fr_3fr_minmax(80px,1fr)] gap-3 px-3 py-2 group bg-black/30 hover:bg-black/40 backdrop-blur-md rounded-md cursor-pointer transition-all border border-white/5 hover:border-white/15 ${currentTrack?.id === track.id ? 'bg-white/10 border-white/20' : ''
+                                            className={`grid grid-cols-[16px_4fr_3fr_minmax(80px,1fr)] gap-3 px-3 py-2 group bg-black/30 hover:bg-black/40 backdrop-blur-md rounded-md cursor-pointer transition-all border border-white/5 hover:border-white/15 ${currentTrack?.id === track.id ? 'bg-black/60 border-white/30' : ''
                                                 }`}
                                             onClick={() => handleTrackClick(track)}
                                             onMouseEnter={() => setHoveredTrack(track.id)}
@@ -1026,11 +1026,11 @@ export function Home({ activePlaylistId, activeAlbumId, activeArtistId, onTrackS
                                                 </div>
                                             </div>
 
-                                            <div className="hidden md:flex items-center text-sm text-text-muted truncate hover:text-white cursor-pointer">
+                                            <div className={`hidden md:flex items-center text-sm truncate hover:text-white cursor-pointer ${currentTrack?.id === track.id ? 'text-white/90' : 'text-text-muted'}`}>
                                                 {track.album}
                                             </div>
 
-                                            <div className="flex items-center justify-end text-sm text-text-muted tabular-nums">
+                                            <div className={`flex items-center justify-end text-sm tabular-nums ${currentTrack?.id === track.id ? 'text-white/90' : 'text-text-muted'}`}>
                                                 {formatDuration(track.duration_ms)}
                                             </div>
                                         </div>

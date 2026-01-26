@@ -82,7 +82,7 @@ function VideoItem({ video, onSelect, formatDuration, isActive = false, isPlayin
                 cursor-pointer transition-all duration-200
                 group border shadow-lg hover:shadow-xl
                 ${isActive 
-                    ? 'bg-white/10 border-white/20' 
+                    ? 'bg-black/20 border-white/20' 
                     : 'bg-white/5 hover:bg-white/10 border-white/5 hover:border-white/10'}
             `}
         >
@@ -157,7 +157,7 @@ function VideoItem({ video, onSelect, formatDuration, isActive = false, isPlayin
                         <div className="w-6 h-6 rounded-full bg-white/5 backdrop-blur-sm flex items-center justify-center border border-white/10">
                             <Music2 size={14} className="text-text-muted" />
                         </div>
-                        <p className="text-text-secondary text-sm truncate hover:text-white transition-colors">
+                        <p className={`text-sm truncate hover:text-white transition-colors ${isActive ? 'text-white/90' : 'text-text-secondary'}`}>
                             {video.uploader}
                         </p>
                     </div>
