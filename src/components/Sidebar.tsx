@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Music, Library, Heart } from 'lucide-react';
+import { Music, Library, Heart, X } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useSpotifyFetch } from '../hooks/useSpotifyFetch';
@@ -7,12 +7,22 @@ import { config } from '../config';
 import { Playlist } from '../types';
 
 
-export function Sidebar() {
+interface SidebarProps {
+    isOpen?: boolean;
+    onClose?: () => void;
+}
+
+export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     const [playlists, setPlaylists] = useState<Playlist[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const { token } = useAuth();
     const fetchWithAuth = useSpotifyFetch();
     const location = useLocation();
+
+    // Close sidebar on route change (mobile)
+    useEffect(() => {
+        onClose?.();
+    }, [location.pathname]);
 
     useEffect(() => {
         const fetchPlaylists = async () => {
@@ -41,22 +51,43 @@ export function Sidebar() {
     }, [token, fetchWithAuth]);
 
     return (
-        <div
-            className="w-72 flex flex-col relative z-30 backdrop-blur-2xl border-r border-white/5 transition-colors duration-700 bg-black/20"
-            style={{
-                height: 'calc(100vh - 6rem)',
-            }}
-        >
-            <div className="p-5 pb-4">
-                <Link to="/" className="flex items-center gap-3 group">
-                    <div className="w-9 h-9 bg-bg-secondary rounded-lg flex items-center justify-center">
-                        <Music size={20} className="text-primary" />
-                    </div>
-                    <span className="text-xl font-semibold text-white">
-                        Music
-                    </span>
-                </Link>
-            </div>
+        <>
+            {/* Mobile Backdrop */}
+            {isOpen && (
+                <div 
+                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
+                    onClick={onClose}
+                />
+            )}
+
+            <div
+                className={`
+                    flex flex-col z-50 backdrop-blur-2xl border-r border-white/5 transition-all duration-300 bg-black/95 md:bg-black/20
+                    fixed inset-y-0 left-0 w-72
+                    md:static md:translate-x-0
+                    ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+                `}
+                style={{
+                    height: 'calc(100vh - 6rem)', // Matches player height logic
+                }}
+            >
+                <div className="p-5 pb-4 flex items-center justify-between">
+                    <Link to="/" className="flex items-center gap-3 group">
+                        <div className="w-9 h-9 bg-bg-secondary rounded-lg flex items-center justify-center">
+                            <Music size={20} className="text-primary" />
+                        </div>
+                        <span className="text-xl font-semibold text-white">
+                            Music
+                        </span>
+                    </Link>
+                    {/* Mobile Close Button */}
+                    <button 
+                        onClick={onClose}
+                        className="md:hidden p-1 hover:bg-white/10 rounded-full transition-colors"
+                    >
+                        <X size={20} className="text-white" />
+                    </button>
+                </div>
 
             <nav className="px-3 mb-4 space-y-1">
                 <Link
@@ -178,5 +209,6 @@ export function Sidebar() {
             </div>
 
         </div>
+        </>
     );
 }

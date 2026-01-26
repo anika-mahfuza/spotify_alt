@@ -329,7 +329,7 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
             
             <div
                 className="
-                    fixed bottom-0 left-0 right-0 h-24
+                    fixed bottom-0 left-0 right-0 h-20 md:h-24
                     border-t border-white/5
                     z-[100]
                     flex flex-col justify-end pb-0
@@ -349,18 +349,18 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
             />
 
             <div
-                className={`relative z-10 flex items-center justify-between h-full px-6 transition-all duration-300`}
+                className={`relative z-10 flex items-center justify-between h-full px-4 md:px-6 transition-all duration-300`}
                 style={{
                     paddingRight: isSidebarOpen && isLargeScreen ? `${sidebarWidth + 24}px` : undefined
                 }}
             >
-                <div className="flex items-center gap-3 w-[30%] min-w-[140px]">
+                <div className="flex items-center gap-3 flex-1 min-w-0 md:w-[30%] md:flex-none">
                     {currentTrack && (
                         <>
                             <div className="relative group/img flex-shrink-0">
                                 <img
                                     src={currentTrack.image || currentTrack.thumbnail || 'https://via.placeholder.com/56'}
-                                    className="h-14 w-14 object-cover rounded shadow-card"
+                                    className="h-10 w-10 md:h-14 md:w-14 object-cover rounded shadow-card"
                                     alt="Cover"
                                 />
                             </div>
@@ -385,11 +385,11 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                     )}
                 </div>
 
-                <div className="flex flex-col items-center w-[40%] max-w-[600px]">
-                    <div className="flex items-center gap-4 mb-1">
+                <div className="flex flex-col items-center w-auto md:w-[40%] md:max-w-[600px]">
+                    <div className="flex items-center gap-2 md:gap-4 mb-1">
                         <button
                             onClick={toggleShuffle}
-                            className={`transition-all duration-150 ${isShuffle ? 'text-[#1DB954]' : 'text-white/70 hover:text-white'}`}
+                            className={`hidden md:block transition-all duration-150 ${isShuffle ? 'text-[#1DB954]' : 'text-white/70 hover:text-white'}`}
                             disabled={isLoading}
                             title="Shuffle"
                         >
@@ -408,7 +408,7 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                         <button
                             onClick={togglePlay}
                             className="
-                                w-8 h-8 bg-white rounded-full
+                                w-8 h-8 md:w-8 md:h-8 bg-white rounded-full
                                 flex items-center justify-center
                                 transition-all hover:scale-105 active:scale-95
                                 text-black
@@ -437,7 +437,7 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
 
                         <button
                             onClick={toggleRepeat}
-                            className={`transition-all duration-150 relative hover:scale-105 ${repeatMode > 0 ? 'text-primary' : 'text-white/70 hover:text-white'}`}
+                            className={`hidden md:block transition-all duration-150 relative hover:scale-105 ${repeatMode > 0 ? 'text-primary' : 'text-white/70 hover:text-white'}`}
                             disabled={isLoading}
                             title={repeatMode === 0 ? "Repeat" : repeatMode === 1 ? "Repeat All" : "Repeat One"}
                         >
@@ -450,7 +450,7 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                         {onToggleNowPlaying && (
                             <button
                                 onClick={onToggleNowPlaying}
-                                className="transition-all text-white/60 hover:text-white"
+                                className="hidden md:block transition-all text-white/60 hover:text-white"
                                 title="Now Playing"
                                 disabled={isLoading}
                             >
@@ -459,7 +459,7 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                         )}
                     </div>
 
-                    <div className="flex items-center gap-2 w-full text-xs text-white/70">
+                    <div className="hidden md:flex items-center gap-2 w-full text-xs text-white/70">
                         <span className="min-w-[40px] text-right tabular-nums">{formatTime(currentTime)}</span>
                         <div className="flex-1 h-1 rounded-full relative group cursor-pointer bg-white/20">
                             <div
@@ -482,7 +482,7 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                     </div>
                 </div>
 
-                <div className="flex items-center justify-end w-[30%] min-w-[140px] gap-2">
+                <div className="hidden md:flex items-center justify-end w-[30%] min-w-[140px] gap-2">
                     <button
                         onClick={toggleMute}
                         className="transition-all text-white/70 hover:text-white"

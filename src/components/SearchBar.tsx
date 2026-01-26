@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Search, X, Home, User, ChevronDown, LogOut } from 'lucide-react';
+import { Search, X, Home, User, ChevronDown, LogOut, Menu } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 
@@ -9,9 +9,10 @@ interface SearchBarProps {
   value?: string;
   onChange?: (value: string) => void;
   showHomeButton?: boolean;
+  onToggleMenu?: () => void;
 }
 
-export const SearchBar = ({ onSearch, isLoading, value, onChange, showHomeButton }: SearchBarProps) => {
+export const SearchBar = ({ onSearch, isLoading, value, onChange, showHomeButton, onToggleMenu }: SearchBarProps) => {
   const [internalQuery, setInternalQuery] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -74,6 +75,25 @@ export const SearchBar = ({ onSearch, isLoading, value, onChange, showHomeButton
   return (
     <div className="flex items-center justify-between w-full" ref={containerRef}>
       <div className="flex items-center gap-3">
+        {/* Mobile Menu Button */}
+        {onToggleMenu && (
+          <button
+            onClick={onToggleMenu}
+            className="
+              md:hidden
+              w-10 h-10 bg-white/10 hover:bg-white/15
+              backdrop-blur-md
+              rounded-full flex items-center justify-center
+              transition-all duration-150
+              hover:scale-[1.02] active:scale-[0.98]
+              border border-white/10 hover:border-white/20
+            "
+            title="Menu"
+          >
+            <Menu size={20} className="text-white" />
+          </button>
+        )}
+
         {showHomeButton && (
           <button
             onClick={() => navigate('/')}

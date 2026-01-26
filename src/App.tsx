@@ -145,6 +145,7 @@ interface MainContentProps {
   setQueue: (queue: Track[]) => void;
   currentIndex: number;
   setCurrentIndex: (index: number) => void;
+  onToggleMenu: () => void;
 }
 
 function MainContent({
@@ -157,7 +158,8 @@ function MainContent({
   queue,
   setQueue,
   currentIndex,
-  setCurrentIndex
+  setCurrentIndex,
+  onToggleMenu
 }: MainContentProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [playingContextId, setPlayingContextId] = useState<string | null>(null);
@@ -344,6 +346,7 @@ function MainContent({
           onSearch={handleSearch}
           isLoading={isSearchLoading}
           showHomeButton={!!(activePlaylistId || activeAlbumId)}
+          onToggleMenu={onToggleMenu}
         />
       </div>
 
@@ -429,6 +432,7 @@ function MainContent({
 
 function MainLayout() {
   const [isNowPlayingSidebarOpen, setIsNowPlayingSidebarOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(320); // Default width
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [artistDetails, setArtistDetails] = useState<Artist | null>(null);
@@ -501,7 +505,10 @@ function MainLayout() {
       {/* Global dynamic background */}
       <DynamicBackground currentTrack={currentTrack} />
 
-      <Sidebar />
+      <Sidebar 
+        isOpen={isMobileMenuOpen} 
+        onClose={() => setIsMobileMenuOpen(false)} 
+      />
       <MainContent
         currentTrack={currentTrack}
         setCurrentTrack={setCurrentTrack}
@@ -513,6 +520,7 @@ function MainLayout() {
         setQueue={setQueue}
         currentIndex={currentIndex}
         setCurrentIndex={setCurrentIndex}
+        onToggleMenu={() => setIsMobileMenuOpen(true)}
       />
       {isNowPlayingSidebarOpen && (
         <NowPlayingSidebar
