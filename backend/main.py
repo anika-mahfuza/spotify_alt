@@ -264,7 +264,8 @@ def search_and_play(q: str = Query(..., min_length=1)):
 @app.get("/play/{video_id}")
 def play(request: Request, video_id: str):
     """Get stream URL for video ID"""
-    base = str(request.base_url).rstrip("/")
+    # Use PUBLIC_API_URL if set (for proxy setups), otherwise use request base
+    base = os.getenv("PUBLIC_API_URL", str(request.base_url).rstrip("/"))
     return {"url": f"{base}/stream/{video_id}", "id": video_id}
 
 @app.get("/stream/{video_id}")
