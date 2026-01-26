@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<body>
+    <input id="q" placeholder="Search song">
+    <button onclick="play()">Play</button>
+
+    <p id="title"></p>
+    <audio id="player" controls autoplay></audio>
+
+    <script>
+        async function play() {
+            const q = document.getElementById("q").value;
+            const res = await fetch(`http://localhost:5000/search?q=${encodeURIComponent(q)}`);
+            const data = await res.json();
+
+            document.getElementById("title").innerText = data.title;
+            document.getElementById("player").src = data.url;
+        }
+    </script>
+</body>
+</html>

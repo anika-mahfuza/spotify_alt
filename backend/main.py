@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from pydantic import BaseModel
 import yt_dlp
 import uvicorn
@@ -8,6 +9,10 @@ import logging
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import os
+import json
+import time
+from typing import Dict, Any
+from dotenv import load_dotenv
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -15,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
-# Enable CORS for frontend
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -24,41 +29,81 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from dotenv import load_dotenv
+# Compression middleware
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 load_dotenv()
 
-# --- Spotify Configuration ---
+# --- Simple Memory Cache ---
+class MemoryCache:
+    def __init__(self, max_size: int = 50):
+        self.cache: Dict[str, Dict[str, Any]] = {}
+        self.max_size = max_size
+    
+    def get(self, key: str) -> str | None:
+        if key in self.cache:
+            item = self.cache[key]
+            if time.time() < item['expires']:
+                return item['value']
+            del self.cache[key]
+        return None
+    
+    def set(self, key: str, value: str, ttl: int = 600):
+        if len(self.cache) >= self.max_size:
+            oldest = min(self.cache.keys(), key=lambda k: self.cache[k]['expires'])
+            del self.cache[oldest]
+        
+        self.cache[key] = {
+            'value': value,
+            'expires': time.time() + ttl
+        }
+    
+    def delete(self, key: str):
+        self.cache.pop(key, None)
+    
+    def size(self) -> int:
+        current = time.time()
+        expired = [k for k, v in self.cache.items() if current >= v['expires']]
+        for k in expired:
+            del self.cache[k]
+        return len(self.cache)
+
+cache = MemoryCache()
+
+# --- Spotify Config ---
 CLIENT_ID = os.getenv("SPOTIPY_CLIENT_ID")
 CLIENT_SECRET = os.getenv("SPOTIPY_CLIENT_SECRET")
 REDIRECT_URI = os.getenv("SPOTIPY_REDIRECT_URI")
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
-SCOPE = "user-library-read playlist-read-private user-read-private streaming"
+# Require FRONTEND_URL to be set in production, or fallback to the known production URL
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://217.154.114.227:11700")
+SCOPE = "user-library-read playlist-read-private user-read-private user-read-email streaming user-read-recently-played user-top-read"
 
 if not CLIENT_ID or not CLIENT_SECRET or not REDIRECT_URI:
-    raise ValueError("Missing Spotify credentials in .env file")
+    raise ValueError("Missing Spotify credentials in .env")
 
 sp_oauth = SpotifyOAuth(
     client_id=CLIENT_ID,
     client_secret=CLIENT_SECRET,
     redirect_uri=REDIRECT_URI,
     scope=SCOPE,
-    cache_handler=spotipy.cache_handler.MemoryCacheHandler()
+    cache_handler=spotipy.cache_handler.MemoryCacheHandler(),
+    show_dialog=True  # Force account selection dialog
 )
 
-# --- YT-DLP Configuration ---
-ydl_opts_search = {
-    'format': 'bestaudio/best',
+# --- YT-DLP Options ---
+YTDL_OPTS = {
+    'format': 'bestaudio[ext=m4a]/bestaudio/best',
     'noplaylist': True,
     'quiet': True,
-    'default_search': 'ytsearch10',
-    'extract_flat': True,
+    'no_warnings': True,
 }
 
-ydl_opts_stream = {
-    'format': 'bestaudio/best',
-    'noplaylist': True,
+YTDL_SEARCH_OPTS = {
     'quiet': True,
+    'no_warnings': True,
+    'noplaylist': True,
+    'extract_flat': 'in_playlist',
+    'skip_download': True,
 }
 
 # --- Models ---
@@ -68,126 +113,522 @@ class VideoResult(BaseModel):
     duration: int | None = None
     thumbnail: str | None = None
     uploader: str | None = None
-    url: str | None = None
 
-class PlayRequest(BaseModel):
-    query: str
+# --- Helper Functions ---
+def extract_audio_url(video_id: str) -> dict:
+    """Extract audio stream URL from YouTube video with caching"""
+    cache_key = f"stream:{video_id}"
+    cached = cache.get(cache_key)
+    
+    if cached:
+        try:
+            return json.loads(cached)
+        except:
+            cache.delete(cache_key)
+    
+    video_url = f"https://www.youtube.com/watch?v={video_id}"
+    
+    with yt_dlp.YoutubeDL(YTDL_OPTS) as ydl:
+        info = ydl.extract_info(video_url, download=False)
+        
+        result = {
+            "url": info.get("url"),
+            "title": info.get("title"),
+            "thumbnail": info.get("thumbnail"),
+            "uploader": info.get("uploader"),
+            "duration": info.get("duration"),
+        }
+        
+        if result["url"]:
+            cache.set(cache_key, json.dumps(result), ttl=600)
+        
+        return result
 
-# --- Endpoints ---
+def search_youtube(query: str, limit: int = 1) -> list:
+    """Search YouTube and return results"""
+    with yt_dlp.YoutubeDL(YTDL_SEARCH_OPTS) as ydl:
+        info = ydl.extract_info(f"ytsearch{limit}:{query}", download=False)
+        
+        results = []
+        if info and 'entries' in info:
+            for entry in info['entries']:
+                if entry:
+                    video_id = entry.get('id')
+                    results.append({
+                        "id": video_id,
+                        "title": entry.get('title'),
+                        "thumbnail": f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg" if video_id else None,
+                        "duration": entry.get('duration'),
+                        "uploader": entry.get('uploader')
+                    })
+        
+        return results
 
+# --- Basic Endpoints ---
 @app.get("/")
-def read_root():
-    return {"status": "ok", "message": "Spotify Alt Backend is running"}
+def root():
+    return {"status": "ok", "message": "Music Player Backend"}
 
+@app.get("/health")
+def health():
+    return {
+        "status": "healthy",
+        "cache_size": cache.size(),
+        "yt_dlp_version": yt_dlp.__version__
+    }
+
+# --- Spotify Auth ---
 @app.get("/login")
-def login():
-    """Redirects user to Spotify Login"""
-    auth_url = sp_oauth.get_authorize_url()
+def login(frontend_url: str | None = None):
+    # Force account selection by adding show_dialog parameter
+    # Use 'state' parameter to pass the frontend_url through Spotify auth flow
+    auth_url = sp_oauth.get_authorize_url(state=frontend_url)
+    # Ensure show_dialog=true is in the URL
+    if 'show_dialog' not in auth_url:
+        separator = '&' if '?' in auth_url else '?'
+        auth_url = f"{auth_url}{separator}show_dialog=true"
     return RedirectResponse(auth_url)
 
 @app.get("/callback")
-def callback(code: str):
-    """Exchanges code for token and redirects to Frontend"""
+def callback(code: str, state: str | None = None):
     try:
-        token_info = sp_oauth.get_access_token(code)
-        access_token = token_info['access_token']
-        return RedirectResponse(f"{FRONTEND_URL}/?token={access_token}")
+        # Avoid DeprecationWarning by requesting string token but retrieving full info from cache
+        sp_oauth.get_access_token(code, as_dict=False)
+        token_info = sp_oauth.get_cached_token()
+        
+        access_token = token_info.get('access_token')
+        refresh_token = token_info.get('refresh_token')
+        expires_in = token_info.get('expires_in')
+        
+        # Determine redirect URL: use state (if valid) or fallback to env var
+        redirect_base = FRONTEND_URL
+        if state and (state.startswith("http://") or state.startswith("https://")):
+            redirect_base = state.rstrip("/")
+            
+        return RedirectResponse(
+            f"{redirect_base}/?token={access_token}&refresh_token={refresh_token}&expires_in={expires_in}"
+        )
     except Exception as e:
         logger.error(f"Auth error: {e}")
-        return {"error": str(e)}
+        raise HTTPException(status_code=401, detail="Authentication failed")
 
-@app.get("/playlists")
-def get_playlists(token: str):
+@app.get("/refresh-token")
+def refresh_token(refresh_token: str):
     try:
-        sp = spotipy.Spotify(auth=token)
-        results = sp.current_user_playlists()
-        return results['items']
+        token_info = sp_oauth.refresh_access_token(refresh_token)
+        return token_info
     except Exception as e:
-        logger.error(f"Playlist error: {e}")
-        raise HTTPException(status_code=401, detail="Invalid Spotify Token or Error")
+        logger.error(f"Refresh error: {e}")
+        raise HTTPException(status_code=401, detail="Refresh failed")
 
-@app.get("/playlist/{playlist_id}")
-def get_playlist_tracks(playlist_id: str, token: str):
-    try:
-        sp = spotipy.Spotify(auth=token)
-        results = sp.playlist_tracks(playlist_id)
-        tracks = []
-        for item in results['items']:
-            track = item['track']
-            if track:
-                tracks.append({
-                    "name": track['name'],
-                    "artist": track['artists'][0]['name'],
-                    "album": track['album']['name'],
-                    "duration_ms": track['duration_ms'],
-                    "image": track['album']['images'][0]['url'] if track['album']['images'] else None,
-                    "id": track['id']
-                })
-        return tracks
-    except Exception as e:
-        logger.error(f"Track error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+@app.get("/logout")
+def logout():
+    return RedirectResponse(f"{FRONTEND_URL}/login")
 
-@app.get("/play/{video_id}")
-def get_stream_url(video_id: str):
-    """Extraction of direct stream URL for a specific video ID."""
-    logger.info(f"Extracting stream for ID: {video_id}")
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts_stream) as ydl:
-            video_url = f"https://www.youtube.com/watch?v={video_id}"
-            info = ydl.extract_info(video_url, download=False)
-            return {
-                "id": info.get('id'),
-                "title": info.get('title'),
-                "url": info.get('url'),
-                "thumbnail": info.get('thumbnail')
-            }
-    except Exception as e:
-        logger.error(f"Stream extraction error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/search-and-play")
-def search_and_play(q: str = Query(..., min_length=1)):
-    """Search YouTube and return playable stream URL"""
-    logger.info(f"Searching and extracting stream for: {q}")
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts_stream) as ydl:
-            info = ydl.extract_info(f"ytsearch1:{q}", download=False)
-            if 'entries' in info and len(info['entries']) > 0:
-                video = info['entries'][0]
-                return {
-                    "id": video.get('id'),
-                    "title": video.get('title'),
-                    "url": video.get('url'),
-                    "thumbnail": video.get('thumbnail'),
-                    "uploader": video.get('uploader')
-                }
-            raise HTTPException(status_code=404, detail="No results found")
-    except Exception as e:
-        logger.error(f"Search and play error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
+# --- YouTube Endpoints ---
 @app.get("/search")
-def search_videos(q: str = Query(..., min_length=1)):
-    logger.info(f"Manual Searching for: {q}")
+def search(q: str = Query(..., min_length=1)):
+    """Search YouTube videos"""
+    logger.info(f"Searching: {q}")
     try:
-        with yt_dlp.YoutubeDL(ydl_opts_search) as ydl:
-            info = ydl.extract_info(f"ytsearch10:{q}", download=False)
-            results = []
-            if 'entries' in info:
-                for entry in info['entries']:
-                    results.append(VideoResult(
-                        id=entry.get('id'),
-                        title=entry.get('title'),
-                        thumbnail=entry.get('thumbnail'),
-                        uploader=entry.get('uploader')
-                    ))
-            return results
+        results = search_youtube(q, limit=10)
+        return [VideoResult(**r) for r in results]
     except Exception as e:
         logger.error(f"Search error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/search-and-play")
+def search_and_play(q: str = Query(..., min_length=1)):
+    """Search and return first playable result"""
+    logger.info(f"Search and play: {q}")
+    try:
+        results = search_youtube(q, limit=1)
+        if not results:
+            raise HTTPException(status_code=404, detail="No results found")
+        
+        video = results[0]
+        stream_info = extract_audio_url(video['id'])
+        
+        return {
+            "id": video['id'],
+            "title": stream_info.get('title') or video['title'],
+            "url": stream_info['url'],
+            "thumbnail": stream_info.get('thumbnail') or video['thumbnail'],
+            "uploader": stream_info.get('uploader') or video['uploader']
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Search and play error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/play/{video_id}")
+def play(request: Request, video_id: str):
+    """Get stream URL for video ID"""
+    base = str(request.base_url).rstrip("/")
+    return {"url": f"{base}/stream/{video_id}", "id": video_id}
+
+@app.get("/stream/{video_id}")
+def stream(video_id: str):
+    """Stream audio from YouTube video"""
+    logger.info(f"Streaming: {video_id}")
+    try:
+        stream_info = extract_audio_url(video_id)
+        if not stream_info.get('url'):
+            raise HTTPException(status_code=500, detail="No audio stream found")
+        
+        return RedirectResponse(url=stream_info['url'], status_code=302)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Stream error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# --- Spotify Endpoints ---
+@app.get("/playlists")
+def get_playlists(token: str):
+    """Get user playlists"""
+    try:
+        sp = spotipy.Spotify(auth=token)
+        playlists = []
+        limit = 50
+        
+        results = sp.current_user_playlists(limit=limit)
+        
+        while results:
+            items = results.get('items', [])
+            if not items:
+                break
+                
+            playlists.extend(items)
+            
+            if results.get('next'):
+                results = sp.next(results)
+            else:
+                break
+            
+        return playlists
+    except Exception as e:
+        logger.error(f"Playlists error: {e}")
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+@app.get("/playlist/{playlist_id}")
+def get_playlist_tracks(playlist_id: str, token: str):
+    """Get all tracks from playlist"""
+    try:
+        sp = spotipy.Spotify(auth=token)
+        tracks = []
+        limit = 100
+        
+        logger.info(f"Starting fetch for playlist {playlist_id}")
+        results = sp.playlist_tracks(playlist_id, limit=limit)
+        
+        while results:
+            items = results.get('items', [])
+            
+            if not items:
+                break
+                
+            for item in items:
+                track = item.get('track')
+                if track:
+                    tracks.append({
+                        "name": track['name'],
+                        "artist": track['artists'][0]['name'] if track.get('artists') else 'Unknown',
+                        "album": track['album']['name'] if track.get('album') else 'Unknown',
+                        "duration_ms": track.get('duration_ms', 0),
+                        "image": track['album']['images'][0]['url'] if track.get('album', {}).get('images') else None,
+                        "id": track['id']
+                    })
+            
+            if results.get('next'):
+                results = sp.next(results)
+            else:
+                break
+        
+        logger.info(f"Loaded {len(tracks)} tracks from playlist {playlist_id}")
+        return tracks
+    except Exception as e:
+        logger.error(f"Playlist tracks error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/album/{album_id}")
+def get_album_tracks(album_id: str, token: str):
+    """Get tracks from album"""
+    try:
+        sp = spotipy.Spotify(auth=token)
+        album = sp.album(album_id)
+        
+        tracks = []
+        for item in album['tracks']['items']:
+            tracks.append({
+                "name": item['name'],
+                "artist": item['artists'][0]['name'],
+                "album": album['name'],
+                "duration_ms": item['duration_ms'],
+                "image": album['images'][0]['url'] if album['images'] else None,
+                "id": item['id']
+            })
+        
+        return {
+            "name": album['name'],
+            "images": album['images'],
+            "tracks": tracks
+        }
+    except Exception as e:
+        logger.error(f"Album error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/artist/{artist_id}")
+def get_artist_details(artist_id: str, token: str):
+    """Get artist details and top tracks"""
+    try:
+        sp = spotipy.Spotify(auth=token)
+        artist = sp.artist(artist_id)
+        top_tracks = sp.artist_top_tracks(artist_id)
+        albums = sp.artist_albums(artist_id, album_type='album', limit=10)
+        
+        return {
+            "artist": artist,
+            "top_tracks": top_tracks.get('tracks', []),
+            "albums": albums.get('items', [])
+        }
+    except Exception as e:
+        logger.error(f"Artist error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/artist-details")
+def get_artist_by_name(artistName: str = Query(...), token: str = Query(...)):
+    """Search for artist by name"""
+    try:
+        sp = spotipy.Spotify(auth=token)
+        results = sp.search(q=f"artist:{artistName}", type='artist', limit=1)
+        items = results.get('artists', {}).get('items', [])
+        
+        if not items:
+            raise HTTPException(status_code=404, detail="Artist not found")
+        
+        return items[0]
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Artist search error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/made-for-you")
+def get_made_for_you(token: str):
+    """Get personalized playlists"""
+    try:
+        sp = spotipy.Spotify(auth=token)
+        playlists = []
+        
+        try:
+            results = sp.category_playlists(category_id='0JQ5DAqbMKFHOzuVTgTizF', limit=10)
+            playlists.extend(results.get('playlists', {}).get('items', []))
+        except:
+            pass
+        
+        if not playlists:
+            search_terms = ["Discover Weekly", "Daily Mix", "Release Radar"]
+            for term in search_terms:
+                try:
+                    result = sp.search(q=term, type='playlist', limit=2)
+                    items = result.get('playlists', {}).get('items', [])
+                    for item in items:
+                        if item and item.get('owner', {}).get('id') == 'spotify':
+                            playlists.append(item)
+                except:
+                    pass
+        
+        seen = set()
+        unique = []
+        for p in playlists:
+            if p and p.get('id') and p['id'] not in seen:
+                seen.add(p['id'])
+                unique.append(p)
+        
+        return unique[:10]
+    except Exception as e:
+        logger.error(f"Made for you error: {e}")
+        return []
+
+@app.get("/top-tracks")
+def get_top_tracks(token: str):
+    """Get user's top tracks"""
+    try:
+        sp = spotipy.Spotify(auth=token)
+        results = sp.current_user_top_tracks(limit=10, time_range='short_term')
+        return results['items']
+    except Exception as e:
+        logger.error(f"Top tracks error: {e}")
+        return []
+
+@app.get("/top-artists")
+def get_top_artists(token: str):
+    """Get user's top artists"""
+    try:
+        sp = spotipy.Spotify(auth=token)
+        results = sp.current_user_top_artists(limit=10, time_range='short_term')
+        return results['items']
+    except Exception as e:
+        logger.error(f"Top artists error: {e}")
+        return []
+
+@app.get("/recommendations")
+def get_recommendations(token: str):
+    """Get personalized recommendations"""
+    try:
+        sp = spotipy.Spotify(auth=token)
+        
+        seed_tracks = []
+        seed_artists = []
+        
+        try:
+            top_tracks = sp.current_user_top_tracks(limit=2, time_range='short_term')
+            seed_tracks = [t['id'] for t in top_tracks.get('items', [])[:2]]
+        except:
+            pass
+        
+        try:
+            top_artists = sp.current_user_top_artists(limit=2, time_range='short_term')
+            seed_artists = [a['id'] for a in top_artists.get('items', [])[:2]]
+        except:
+            pass
+        
+        if not seed_tracks and not seed_artists:
+            return []
+        
+        results = sp.recommendations(
+            seed_tracks=seed_tracks[:2],
+            seed_artists=seed_artists[:2],
+            limit=20
+        )
+        return results.get('tracks', [])
+    except Exception as e:
+        logger.error(f"Recommendations error: {e}")
+        return []
+
+@app.get("/saved-albums")
+def get_saved_albums(token: str):
+    """Get user's saved albums"""
+    try:
+        sp = spotipy.Spotify(auth=token)
+        albums = []
+        limit = 50
+        
+        results = sp.current_user_saved_albums(limit=limit)
+        
+        while results:
+            items = results.get('items', [])
+            if not items:
+                break
+                
+            for item in items:
+                if item.get('album'):
+                    albums.append(item['album'])
+            
+            if results.get('next'):
+                results = sp.next(results)
+            else:
+                break
+            
+        return albums
+    except Exception as e:
+        logger.error(f"Saved albums error: {e}")
+        return []
+
+@app.get("/saved-tracks")
+def get_saved_tracks(token: str):
+    """Get user's saved tracks"""
+    try:
+        sp = spotipy.Spotify(auth=token)
+        tracks = []
+        limit = 50
+        
+        results = sp.current_user_saved_tracks(limit=limit)
+        
+        while results:
+            items = results.get('items', [])
+            if not items:
+                break
+                
+            for item in items:
+                if item.get('track'):
+                    tracks.append(item['track'])
+            
+            if results.get('next'):
+                results = sp.next(results)
+            else:
+                break
+            
+        return tracks
+    except Exception as e:
+        logger.error(f"Saved tracks error: {e}")
+        return []
+
+@app.get("/browse-categories")
+def get_browse_categories(token: str):
+    """Get browse categories with playlists"""
+    try:
+        sp = spotipy.Spotify(auth=token)
+        categories = sp.categories(limit=8)
+        
+        result = []
+        for cat in categories.get('categories', {}).get('items', []):
+            try:
+                playlists = sp.category_playlists(category_id=cat['id'], limit=6)
+                result.append({
+                    "id": cat['id'],
+                    "name": cat['name'],
+                    "icons": cat.get('icons', []),
+                    "playlists": playlists.get('playlists', {}).get('items', [])
+                })
+            except Exception as e:
+                logger.warning(f"Category {cat['id']} failed: {e}")
+        
+        return result
+    except Exception as e:
+        logger.error(f"Browse categories error: {e}")
+        return []
+
+@app.get("/followed-artists")
+def get_followed_artists(token: str):
+    """Get followed artists"""
+    try:
+        sp = spotipy.Spotify(auth=token)
+        artists = []
+        limit = 50
+        
+        response = sp.current_user_followed_artists(limit=limit)
+        
+        while response:
+            artists_data = response.get('artists', {})
+            items = artists_data.get('items', [])
+            if not items:
+                break
+                
+            artists.extend(items)
+            
+            if artists_data.get('next'):
+                response = sp.next(artists_data)
+            else:
+                break
+                
+        return artists
+    except Exception as e:
+        logger.error(f"Followed artists error: {e}")
+        return []
+
 if __name__ == "__main__":
     port = int(os.environ.get("SERVER_PORT", os.environ.get("PORT", 11700)))
-    logger.info(f"Starting Spotify Alt Backend on port {port}")
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    logger.info(f"Starting server on port {port}")
+    
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=port,
+        workers=1,
+        limit_concurrency=10,
+        timeout_keep_alive=5,
+        access_log=False
+    )

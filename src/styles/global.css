@@ -1,0 +1,27 @@
+/* Global background: allow dynamic background to show through */
+html,
+body,
+#root {
+  height: 100%;
+  background-color: transparent;
+  /* Changed from fixed color */
+}
+
+body {
+  margin: 0;
+  color: #e5e7eb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Allow transparency for these elements so the dynamic background works */
+.bg-black,
+.bg-bg-base,
+.bg-bg-secondary,
+.bg-bg-tertiary,
+.bg-dark,
+.bg-dark-900 {
+  background-color: transparent !important;
+}
