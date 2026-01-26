@@ -228,18 +228,15 @@ def logout():
 @app.get("/search")
 def search(q: str = Query(..., min_length=1)):
     """Search YouTube videos"""
-    logger.info(f"Searching: {q}")
     try:
         results = search_youtube(q, limit=10)
         return [VideoResult(**r) for r in results]
     except Exception as e:
-        logger.error(f"Search error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/search-and-play")
 def search_and_play(q: str = Query(..., min_length=1)):
     """Search and return first playable result"""
-    logger.info(f"Search and play: {q}")
     try:
         results = search_youtube(q, limit=1)
         if not results:
@@ -258,7 +255,6 @@ def search_and_play(q: str = Query(..., min_length=1)):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Search and play error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/play/{video_id}")
@@ -269,31 +265,27 @@ def play(request: Request, video_id: str):
     return {"url": f"{base}/stream/{video_id}", "id": video_id}
 
 @app.get("/stream/{video_id}")
-def stream(video_id: str):
+async def stream(video_id: str):
     """Stream audio from YouTube video"""
-    logger.info(f"Streaming: {video_id}")
     try:
         stream_info = extract_audio_url(video_id)
         url = stream_info.get('url')
         if not url:
             raise HTTPException(status_code=500, detail="No audio stream found")
         
-        # Proxy the stream using requests and StreamingResponse
-        # This ensures the request to Google comes from the Backend IP
-        def iterfile():
-            try:
-                with requests.get(url, stream=True, timeout=10) as r:
+        # Async Proxy using httpx
+        # Using a generator to stream chunks as they arrive
+        async def iterfile():
+            async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
+                async with client.stream("GET", url) as r:
                     r.raise_for_status()
-                    for chunk in r.iter_content(chunk_size=64*1024): # 64k chunks
+                    async for chunk in r.aiter_bytes(chunk_size=128*1024): # 128KB chunks
                         yield chunk
-            except Exception as e:
-                logger.error(f"Streaming connection failed: {e}")
 
         return StreamingResponse(iterfile(), media_type="audio/mp4")
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Stream error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # --- Spotify Endpoints ---
@@ -321,7 +313,6 @@ def get_playlists(token: str):
             
         return playlists
     except Exception as e:
-        logger.error(f"Playlists error: {e}")
         raise HTTPException(status_code=401, detail="Invalid token")
 
 @app.get("/playlist/{playlist_id}")
@@ -332,7 +323,6 @@ def get_playlist_tracks(playlist_id: str, token: str):
         tracks = []
         limit = 100
         
-        logger.info(f"Starting fetch for playlist {playlist_id}")
         results = sp.playlist_tracks(playlist_id, limit=limit)
         
         while results:
@@ -358,10 +348,8 @@ def get_playlist_tracks(playlist_id: str, token: str):
             else:
                 break
         
-        logger.info(f"Loaded {len(tracks)} tracks from playlist {playlist_id}")
         return tracks
     except Exception as e:
-        logger.error(f"Playlist tracks error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/album/{album_id}")
@@ -388,7 +376,6 @@ def get_album_tracks(album_id: str, token: str):
             "tracks": tracks
         }
     except Exception as e:
-        logger.error(f"Album error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/artist/{artist_id}")
@@ -406,7 +393,6 @@ def get_artist_details(artist_id: str, token: str):
             "albums": albums.get('items', [])
         }
     except Exception as e:
-        logger.error(f"Artist error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/artist-details")
@@ -424,7 +410,6 @@ def get_artist_by_name(artistName: str = Query(...), token: str = Query(...)):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Artist search error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/made-for-you")
@@ -461,7 +446,6 @@ def get_made_for_you(token: str):
         
         return unique[:10]
     except Exception as e:
-        logger.error(f"Made for you error: {e}")
         return []
 
 @app.get("/top-tracks")
@@ -472,7 +456,6 @@ def get_top_tracks(token: str):
         results = sp.current_user_top_tracks(limit=10, time_range='short_term')
         return results['items']
     except Exception as e:
-        logger.error(f"Top tracks error: {e}")
         return []
 
 @app.get("/top-artists")
@@ -483,7 +466,6 @@ def get_top_artists(token: str):
         results = sp.current_user_top_artists(limit=10, time_range='short_term')
         return results['items']
     except Exception as e:
-        logger.error(f"Top artists error: {e}")
         return []
 
 @app.get("/recommendations")
@@ -517,7 +499,6 @@ def get_recommendations(token: str):
         )
         return results.get('tracks', [])
     except Exception as e:
-        logger.error(f"Recommendations error: {e}")
         return []
 
 @app.get("/saved-albums")
@@ -546,7 +527,6 @@ def get_saved_albums(token: str):
             
         return albums
     except Exception as e:
-        logger.error(f"Saved albums error: {e}")
         return []
 
 @app.get("/saved-tracks")
@@ -575,7 +555,6 @@ def get_saved_tracks(token: str):
             
         return tracks
     except Exception as e:
-        logger.error(f"Saved tracks error: {e}")
         return []
 
 @app.get("/browse-categories")
@@ -596,11 +575,10 @@ def get_browse_categories(token: str):
                     "playlists": playlists.get('playlists', {}).get('items', [])
                 })
             except Exception as e:
-                logger.warning(f"Category {cat['id']} failed: {e}")
+                pass
         
         return result
     except Exception as e:
-        logger.error(f"Browse categories error: {e}")
         return []
 
 @app.get("/followed-artists")
@@ -628,12 +606,10 @@ def get_followed_artists(token: str):
                 
         return artists
     except Exception as e:
-        logger.error(f"Followed artists error: {e}")
         return []
 
 if __name__ == "__main__":
     port = int(os.environ.get("SERVER_PORT", os.environ.get("PORT", 11700)))
-    logger.info(f"Starting server on port {port}")
     
     uvicorn.run(
         app,
