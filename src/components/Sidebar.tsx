@@ -55,14 +55,14 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
             {/* Mobile Backdrop */}
             {isOpen && (
                 <div 
-                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
+                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[190] md:hidden"
                     onClick={onClose}
                 />
             )}
 
             <div
                 className={`
-                    flex flex-col z-50 backdrop-blur-2xl border-r border-white/5 transition-all duration-300 bg-black/95 md:bg-black/20
+                    flex flex-col z-[200] backdrop-blur-2xl border-r border-white/5 transition-all duration-300 bg-black/95 md:bg-black/20
                     fixed inset-y-0 left-0 w-72
                     md:static md:translate-x-0
                     ${isOpen ? 'translate-x-0' : '-translate-x-full'}

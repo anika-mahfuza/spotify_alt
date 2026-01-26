@@ -329,7 +329,7 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
             
             <div
                 className="
-                    fixed bottom-0 left-0 right-0 h-20 md:h-24
+                    fixed bottom-0 left-0 right-0 h-16 md:h-24
                     border-t border-white/5
                     z-[100]
                     flex flex-col justify-end pb-0
@@ -348,12 +348,21 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                 }}
             />
 
+            {/* Progress Bar for Mobile (Bottom Edge) */}
+            <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-white/20 md:hidden z-20">
+                 <div 
+                    className="h-full bg-white transition-all duration-300"
+                    style={{ width: `${progress}%` }}
+                 />
+            </div>
+
             <div
-                className={`relative z-10 flex items-center justify-between h-full px-4 md:px-6 transition-all duration-300`}
+                className={`relative z-10 flex items-center justify-between h-full px-3 md:px-6 transition-all duration-300`}
                 style={{
                     paddingRight: isSidebarOpen && isLargeScreen ? `${sidebarWidth + 24}px` : undefined
                 }}
             >
+                {/* Track Info */}
                 <div className="flex items-center gap-3 flex-1 min-w-0 md:w-[30%] md:flex-none">
                     {currentTrack && (
                         <>
@@ -366,12 +375,11 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                             </div>
                             <div className="flex flex-col justify-center overflow-hidden min-w-0">
                                 <span
-                                    className="text-sm font-medium truncate hover:underline cursor-pointer"
-                                    style={{ color: '#FFFFFF' }} // Force white for now to fix black text issue
+                                    className="text-sm font-medium truncate hover:underline cursor-pointer text-white"
                                 >
                                     {currentTrack.name || "No Title"}
                                 </span>
-                                <span className="text-xs truncate opacity-70" style={{ color: '#E0E0E0' }}>
+                                <span className="text-xs truncate opacity-70 text-[#E0E0E0]">
                                     {isLoading ? (
                                         <span className="opacity-70">Loading...</span>
                                     ) : error ? (
@@ -385,8 +393,10 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                     )}
                 </div>
 
-                <div className="flex flex-col items-center w-auto md:w-[40%] md:max-w-[600px]">
-                    <div className="flex items-center gap-2 md:gap-4 mb-1">
+                {/* Controls - Mobile: Right Aligned, Desktop: Centered */}
+                <div className="flex flex-col items-center w-auto flex-none md:flex-1 md:w-[40%] md:max-w-[600px]">
+                    <div className="flex items-center gap-4 mb-1">
+                        {/* Desktop Controls */}
                         <button
                             onClick={toggleShuffle}
                             className={`hidden md:block transition-all duration-150 ${isShuffle ? 'text-[#1DB954]' : 'text-white/70 hover:text-white'}`}
@@ -398,13 +408,14 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
 
                         <button
                             onClick={onPrev}
-                            className="transition-all hover:scale-105 text-white/70 hover:text-white"
+                            className="hidden md:block transition-all hover:scale-105 text-white/70 hover:text-white"
                             disabled={isLoading}
                             title="Previous"
                         >
                             <SkipBack size={20} fill="currentColor" strokeWidth={0} />
                         </button>
 
+                        {/* Play/Pause - Visible on All */}
                         <button
                             onClick={togglePlay}
                             className="
@@ -426,14 +437,18 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                             )}
                         </button>
 
+                        {/* Next - Hidden on mobile if space is tight, or visible? Let's hide to keep it minimal as requested */}
                         <button
                             onClick={onNext}
-                            className="transition-all hover:scale-105 text-white/70 hover:text-white"
+                            className="hidden md:block transition-all hover:scale-105 text-white/70 hover:text-white"
                             disabled={isLoading}
                             title="Next"
                         >
                             <SkipForward size={20} fill="currentColor" strokeWidth={0} />
                         </button>
+
+                         {/* Mobile Next Button (Optional) - Uncomment if user wants it, but mini player usually has just Play/Pause or Play/Next */}
+                         {/* We'll keep it simple for now as per 'useless layout' complaint */}
 
                         <button
                             onClick={toggleRepeat}
