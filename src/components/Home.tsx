@@ -278,10 +278,10 @@ export function Home({ activePlaylistId, activeAlbumId, activeArtistId, onTrackS
                     ] = await Promise.allSettled([
                         // Recently Played - Direct Spotify API
                         fetchJson('https://api.spotify.com/v1/me/player/recently-played?limit=20'),
-                        // Featured Playlists - Add country=US to avoid 404s
-                        fetchJson('https://api.spotify.com/v1/browse/featured-playlists?limit=20&country=US'),
-                        // New Releases - Add country=US to avoid 404s
-                        fetchJson('https://api.spotify.com/v1/browse/new-releases?limit=20&country=US'),
+                        // Featured Playlists
+                        fetchJson('https://api.spotify.com/v1/browse/featured-playlists?limit=20'),
+                        // New Releases
+                        fetchJson('https://api.spotify.com/v1/browse/new-releases?limit=20'),
                         // Made For You (via backend)
                         fetchJson(`${config.API_URL}/made-for-you`),
                         // Top Tracks (via backend)
@@ -294,8 +294,8 @@ export function Home({ activePlaylistId, activeAlbumId, activeArtistId, onTrackS
                         fetchJson(`${config.API_URL}/saved-albums`),
                         // User Playlists (via backend)
                         fetchJson(`${config.API_URL}/playlists`),
-                        // Browse Categories (via backend) - Add country=US
-                        fetchJson(`${config.API_URL}/browse-categories?country=US`),
+                        // Browse Categories (via backend)
+                        fetchJson(`${config.API_URL}/browse-categories`),
                         // Liked Songs (via backend)
                         fetchJson(`${config.API_URL}/saved-tracks`),
                         // Followed Artists (via backend)
