@@ -483,23 +483,20 @@ def get_made_for_you(token: str):
         sp = spotipy.Spotify(auth=token)
         playlists = []
         
-        try:
-            results = sp.category_playlists(category_id='0JQ5DAqbMKFHOzuVTgTizF', limit=10)
-            playlists.extend(results.get('playlists', {}).get('items', []))
-        except:
-            pass
+        # Try to get category playlists (skip hardcoded ID if it fails frequently)
+        # Instead, we'll rely on search for "Made For You" type content which is more reliable across regions
         
-        if not playlists:
-            search_terms = ["Discover Weekly", "Daily Mix", "Release Radar"]
-            for term in search_terms:
-                try:
-                    result = sp.search(q=term, type='playlist', limit=2)
-                    items = result.get('playlists', {}).get('items', [])
-                    for item in items:
-                        if item and item.get('owner', {}).get('id') == 'spotify':
-                            playlists.append(item)
-                except:
-                    pass
+        search_terms = ["Discover Weekly", "Daily Mix", "Release Radar", "On Repeat", "Time Capsule"]
+        for term in search_terms:
+            try:
+                result = sp.search(q=term, type='playlist', limit=2)
+                items = result.get('playlists', {}).get('items', [])
+                for item in items:
+                    # Filter for Spotify-owned playlists to ensure quality
+                    if item and (item.get('owner', {}).get('id') == 'spotify' or 'Mix' in item.get('name', '')):
+                        playlists.append(item)
+            except:
+                pass
         
         seen = set()
         unique = []
