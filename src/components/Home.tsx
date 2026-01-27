@@ -56,7 +56,7 @@ function MediaCard({
 }) {
     return (
         <div
-            className="group bg-black/30 hover:bg-black/40 backdrop-blur-md p-3 md:p-4 rounded-md transition-all duration-200 cursor-pointer border border-white/5 hover:border-white/10 shadow-lg hover:shadow-xl hover:scale-[1.02]"
+            className="group bg-black/30 hover:bg-black/40 backdrop-blur-md p-3 md:p-4 rounded-md transition-all duration-200 cursor-pointer border border-white/5 hover:border-white/10 shadow-lg hover:shadow-xl hover:scale-[1.02] flex-shrink-0 w-[140px] md:w-auto snap-start"
             onClick={onClick}
         >
             <div className={`relative mb-3 aspect-square ${isRound ? 'rounded-full' : 'rounded'} overflow-hidden`}>

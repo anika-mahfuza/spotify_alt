@@ -363,7 +363,7 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                 }}
             >
                 {/* Track Info */}
-                <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0 max-w-[60%] sm:max-w-[55%] md:max-w-none md:w-[30%] md:flex-none">
+                <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0 md:max-w-none md:w-[30%] md:flex-none">
                     {currentTrack && (
                         <>
                             <div className="relative group/img flex-shrink-0">
