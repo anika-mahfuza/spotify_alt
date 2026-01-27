@@ -332,14 +332,13 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
             <div
                 className="
                     fixed bottom-0 left-0 right-0 
-                    h-[130px] md:h-24
+                    h-auto min-h-[140px] md:h-24 md:min-h-0
                     border-t border-white/5
                     z-[100]
                     flex flex-col justify-end pb-0
                     bg-black/95 backdrop-blur-xl
                 "
                 style={{
-                    height: 'calc(130px + env(safe-area-inset-bottom))',
                     paddingBottom: 'env(safe-area-inset-bottom)',
                 }}
             >
@@ -359,7 +358,7 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
             </div>
 
             <div
-                className={`relative z-10 flex flex-col md:flex-row items-center justify-between h-full px-4 md:px-6 py-2 md:py-0 transition-all duration-300 gap-1 md:gap-0`}
+                className={`relative z-10 flex flex-col md:flex-row items-center justify-between h-full px-4 md:px-6 py-3 md:py-0 transition-all duration-300 gap-3 md:gap-0`}
                 style={{
                     paddingRight: isSidebarOpen && isLargeScreen ? `${sidebarWidth + 24}px` : undefined
                 }}
@@ -375,7 +374,7 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                                     alt="Cover"
                                 />
                             </div>
-                            <div className="flex flex-col justify-center overflow-hidden min-w-0">
+                            <div className="flex flex-col justify-center overflow-hidden min-w-0 flex-1">
                                 <span
                                     className="text-sm font-medium truncate hover:underline cursor-pointer text-white leading-tight"
                                 >
@@ -391,20 +390,32 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                                     )}
                                 </span>
                             </div>
+                            
+                            {/* Mobile Now Playing Toggle (moved here for better space usage) */}
+                            {onToggleNowPlaying && (
+                                <button
+                                    onClick={onToggleNowPlaying}
+                                    className="md:hidden transition-all text-white/60 hover:text-white p-2"
+                                    title="Now Playing"
+                                    disabled={isLoading}
+                                >
+                                    <Music size={20} strokeWidth={2} />
+                                </button>
+                            )}
                         </>
                     )}
                 </div>
 
                 {/* Controls */}
-                <div className="flex flex-col items-center justify-center w-full md:flex-1 md:w-[40%] md:max-w-[600px] gap-1">
-                    <div className="flex items-center justify-between w-full md:justify-center md:gap-6 px-2 md:px-0">
+                <div className="flex flex-col items-center justify-center w-full md:flex-1 md:w-[40%] md:max-w-[600px] gap-2">
+                    <div className="flex items-center justify-between w-full md:justify-center md:gap-6 px-4 md:px-0">
                         <button
                             onClick={toggleShuffle}
                             className={`transition-all duration-150 ${isShuffle ? 'text-[#1DB954]' : 'text-white/70 hover:text-white'}`}
                             disabled={isLoading}
                             title="Shuffle"
                         >
-                            <Shuffle size={16} strokeWidth={2} />
+                            <Shuffle size={18} strokeWidth={2} />
                         </button>
 
                         <button
@@ -413,13 +424,13 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                             disabled={isLoading}
                             title="Previous"
                         >
-                            <SkipBack size={20} className="md:w-5 md:h-5" fill="currentColor" strokeWidth={0} />
+                            <SkipBack size={22} className="md:w-5 md:h-5" fill="currentColor" strokeWidth={0} />
                         </button>
 
                         <button
                             onClick={togglePlay}
                             className="
-                                w-8 h-8 md:w-10 md:h-10 bg-white rounded-full
+                                w-10 h-10 md:w-10 md:h-10 bg-white rounded-full
                                 flex items-center justify-center
                                 transition-all hover:scale-105 active:scale-95
                                 text-black shadow-lg
@@ -429,11 +440,11 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                             title={isPlaying ? "Pause" : "Play"}
                         >
                             {isLoading ? (
-                                <div className="w-3 h-3 md:w-4 md:h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                                <div className="w-4 h-4 md:w-4 md:h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
                             ) : isPlaying ? (
-                                <Pause size={16} className="md:w-5 md:h-5" fill="currentColor" strokeWidth={0} />
+                                <Pause size={20} className="md:w-5 md:h-5" fill="currentColor" strokeWidth={0} />
                             ) : (
-                                <Play size={16} className="md:w-5 md:h-5 ml-0.5" fill="currentColor" strokeWidth={0} />
+                                <Play size={20} className="md:w-5 md:h-5 ml-0.5" fill="currentColor" strokeWidth={0} />
                             )}
                         </button>
 
@@ -443,7 +454,7 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                             disabled={isLoading}
                             title="Next"
                         >
-                            <SkipForward size={20} className="md:w-5 md:h-5" fill="currentColor" strokeWidth={0} />
+                            <SkipForward size={22} className="md:w-5 md:h-5" fill="currentColor" strokeWidth={0} />
                         </button>
 
                         <button
@@ -452,25 +463,14 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                             disabled={isLoading}
                             title={repeatMode === 0 ? "Repeat" : repeatMode === 1 ? "Repeat All" : "Repeat One"}
                         >
-                            <Repeat size={16} strokeWidth={2} />
+                            <Repeat size={18} strokeWidth={2} />
                             {repeatMode === 2 && (
                                 <span className="absolute -top-1 left-1/2 -translate-x-1/2 text-[8px] font-bold">1</span>
                             )}
                         </button>
-
-                        {onToggleNowPlaying && (
-                            <button
-                                onClick={onToggleNowPlaying}
-                                className="hidden md:block transition-all text-white/60 hover:text-white"
-                                title="Now Playing"
-                                disabled={isLoading}
-                            >
-                                <Music size={18} strokeWidth={2} />
-                            </button>
-                        )}
                     </div>
 
-                    {/* Progress Bar - Visible on Mobile now */}
+                    {/* Progress Bar */}
                     <div className="flex items-center gap-2 w-full text-xs text-white/70">
                         <span className="min-w-[35px] text-right tabular-nums text-[10px] md:text-xs">{formatTime(currentTime)}</span>
                         <div className="flex-1 h-1 rounded-full relative group cursor-pointer bg-white/20">
@@ -494,32 +494,47 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                     </div>
                 </div>
 
-                <div className="hidden md:flex items-center justify-end w-[30%] min-w-[140px] gap-2">
-                    <button
-                        onClick={toggleMute}
-                        className="transition-all text-white/70 hover:text-white"
-                        title={volume === 0 ? "Unmute" : "Mute"}
-                    >
-                        {volume === 0 ? <VolumeX size={18} strokeWidth={2} /> : <Volume2 size={18} strokeWidth={2} />}
-                    </button>
+                {/* Right Controls (Volume etc) */}
+                <div className="flex md:flex items-center justify-between md:justify-end w-full md:w-[30%] md:min-w-[140px] gap-2 pt-1 md:pt-0 border-t border-white/5 md:border-none">
+                    <div className="flex items-center gap-2 flex-1 md:flex-none md:w-32">
+                         <button
+                            onClick={toggleMute}
+                            className="transition-all text-white/70 hover:text-white"
+                            title={volume === 0 ? "Unmute" : "Mute"}
+                        >
+                            {volume === 0 ? <VolumeX size={18} strokeWidth={2} /> : <Volume2 size={18} strokeWidth={2} />}
+                        </button>
 
-                    <div className="group relative w-20 h-1 rounded-full cursor-pointer bg-white/20">
-                        <div
-                            className="absolute top-0 left-0 h-full rounded-full transition-all bg-white"
-                            style={{
-                                width: `${volume * 100}%`
-                            }}
-                        />
-                        <input
-                            type="range"
-                            min="0"
-                            max="1"
-                            step="0.01"
-                            value={volume}
-                            onChange={handleVolume}
-                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                        />
+                        <div className="group relative h-1 flex-1 rounded-full cursor-pointer bg-white/20">
+                            <div
+                                className="absolute top-0 left-0 h-full rounded-full transition-all bg-white"
+                                style={{
+                                    width: `${volume * 100}%`
+                                }}
+                            />
+                            <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.01"
+                                value={volume}
+                                onChange={handleVolume}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            />
+                        </div>
                     </div>
+
+                    {/* Desktop Now Playing Toggle */}
+                    {onToggleNowPlaying && (
+                        <button
+                            onClick={onToggleNowPlaying}
+                            className="hidden md:block transition-all text-white/60 hover:text-white"
+                            title="Now Playing"
+                            disabled={isLoading}
+                        >
+                            <Music size={18} strokeWidth={2} />
+                        </button>
+                    )}
                 </div>
             </div>
             </div>
