@@ -504,7 +504,7 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                         {volume === 0 ? <VolumeX size={18} strokeWidth={2} /> : <Volume2 size={18} strokeWidth={2} />}
                     </button>
 
-                    <div className="group relative w-20 h-1 rounded-full cursor-pointer bg-white/20">
+                    <div className="group relative w-16 md:w-20 h-1 rounded-full cursor-pointer bg-white/20">
                         <div
                             className="absolute top-0 left-0 h-full rounded-full transition-all bg-white"
                             style={{
