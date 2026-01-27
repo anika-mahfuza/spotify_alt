@@ -179,10 +179,15 @@ def root():
 
 @app.get("/health")
 def health():
+    try:
+        ytdlp_version = yt_dlp.version.__version__
+    except (AttributeError, ImportError):
+        ytdlp_version = "unknown"
+    
     return {
         "status": "healthy",
         "cache_size": cache.size(),
-        "yt_dlp_version": yt_dlp.__version__
+        "yt_dlp_version": ytdlp_version
     }
 
 # --- Spotify Auth ---

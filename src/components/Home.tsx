@@ -56,7 +56,7 @@ function MediaCard({
 }) {
     return (
         <div
-            className="group bg-black/30 hover:bg-black/40 backdrop-blur-md p-3 rounded-md transition-all duration-200 cursor-pointer border border-white/5 hover:border-white/10 shadow-lg hover:shadow-xl hover:scale-[1.02]"
+            className="group bg-black/30 hover:bg-black/40 backdrop-blur-md p-3 md:p-4 rounded-md transition-all duration-200 cursor-pointer border border-white/5 hover:border-white/10 shadow-lg hover:shadow-xl hover:scale-[1.02]"
             onClick={onClick}
         >
             <div className={`relative mb-3 aspect-square ${isRound ? 'rounded-full' : 'rounded'} overflow-hidden`}>
@@ -75,7 +75,7 @@ function MediaCard({
 
                 {showPlayButton && (
                     <button
-                        className={`absolute right-2 bottom-2 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200
+                        className={`absolute right-1.5 bottom-1.5 md:right-2 md:bottom-2 w-9 h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center transition-all duration-200 shadow-lg
                             ${isActive 
                                 ? 'bg-primary opacity-100 translate-y-0' 
                                 : 'bg-white opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0'
@@ -87,9 +87,9 @@ function MediaCard({
                         }}
                     >
                         {isActive && isPlaying ? (
-                            <Pause size={18} fill="black" className="text-black" />
+                            <Pause size={16} className="md:w-[18px] md:h-[18px]" fill="black" />
                         ) : (
-                            <Play size={18} fill="black" className="text-black ml-0.5" />
+                            <Play size={16} className="md:w-[18px] md:h-[18px] ml-0.5" fill="black" />
                         )}
                     </button>
                 )}
@@ -125,10 +125,10 @@ function QuickPlayCard({
 }) {
     return (
         <div
-            className="group flex items-center bg-black/30 hover:bg-black/40 backdrop-blur-md rounded-md overflow-hidden transition-all duration-200 cursor-pointer h-[56px] border border-white/5 hover:border-white/10 shadow-lg hover:shadow-xl hover:scale-[1.02]"
+            className="group flex items-center bg-black/30 hover:bg-black/40 backdrop-blur-md rounded-md overflow-hidden transition-all duration-200 cursor-pointer h-[56px] md:h-[64px] border border-white/5 hover:border-white/10 shadow-lg hover:shadow-xl hover:scale-[1.02]"
             onClick={onClick}
         >
-            <div className="w-14 h-14 flex-shrink-0 shadow-card">
+            <div className="w-14 h-14 md:w-16 md:h-16 flex-shrink-0 shadow-card">
                 {image ? (
                     <img src={image} alt={title} className="w-full h-full object-cover" loading="lazy" />
                 ) : (
@@ -137,9 +137,9 @@ function QuickPlayCard({
                     </div>
                 )}
             </div>
-            <span className={`flex-1 font-medium text-sm px-3 truncate ${isActive ? 'text-primary' : 'text-white'}`}>{title}</span>
+            <span className={`flex-1 font-medium text-xs sm:text-sm px-2 sm:px-3 truncate ${isActive ? 'text-primary' : 'text-white'}`}>{title}</span>
             <button
-                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 mr-2
+                className={`w-9 h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center transition-all duration-200 mr-1.5 md:mr-2 shadow-lg flex-shrink-0
                     ${isActive 
                         ? 'bg-primary opacity-100' 
                         : 'bg-white opacity-0 group-hover:opacity-100'
@@ -150,9 +150,9 @@ function QuickPlayCard({
                 }}
             >
                 {isActive && isPlaying ? (
-                    <Pause size={18} fill="black" className="text-black" />
+                    <Pause size={16} className="md:w-[18px] md:h-[18px]" fill="black" />
                 ) : (
-                    <Play size={18} fill="black" className="text-black ml-0.5" />
+                    <Play size={16} className="md:w-[18px] md:h-[18px] ml-0.5" fill="black" />
                 )}
             </button>
         </div>

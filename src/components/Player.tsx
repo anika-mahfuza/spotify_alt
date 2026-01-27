@@ -331,14 +331,14 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
             
             <div
                 className="
-                    fixed bottom-0 left-0 right-0 h-20 md:h-24
+                    fixed bottom-0 left-0 right-0 h-[72px] md:h-24
                     border-t border-white/5
                     z-[100]
                     flex flex-col justify-end pb-0
                     bg-black/95 backdrop-blur-xl
                 "
                 style={{
-                    height: 'calc(5rem + env(safe-area-inset-bottom))',
+                    height: 'calc(72px + env(safe-area-inset-bottom))',
                     paddingBottom: 'env(safe-area-inset-bottom)',
                 }}
             >
@@ -357,13 +357,13 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
             </div>
 
             <div
-                className={`relative z-10 flex items-center justify-between h-full px-4 md:px-6 transition-all duration-300`}
+                className={`relative z-10 flex items-center justify-between h-full px-2 md:px-6 transition-all duration-300 gap-2 md:gap-0`}
                 style={{
                     paddingRight: isSidebarOpen && isLargeScreen ? `${sidebarWidth + 24}px` : undefined
                 }}
             >
                 {/* Track Info */}
-                <div className="flex items-center gap-3 flex-1 min-w-0 md:w-[30%] md:flex-none">
+                <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0 max-w-[40%] sm:max-w-[45%] md:max-w-none md:w-[30%] md:flex-none">
                     {currentTrack && (
                         <>
                             <div className="relative group/img flex-shrink-0">
@@ -373,13 +373,13 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                                     alt="Cover"
                                 />
                             </div>
-                            <div className="flex flex-col justify-center overflow-hidden min-w-0 mr-2">
+                            <div className="flex flex-col justify-center overflow-hidden min-w-0">
                                 <span
-                                    className="text-sm font-medium truncate hover:underline cursor-pointer text-white"
+                                    className="text-sm md:text-sm font-medium truncate hover:underline cursor-pointer text-white leading-tight"
                                 >
                                     {currentTrack.name || "No Title"}
                                 </span>
-                                <span className="text-xs truncate opacity-70 text-[#E0E0E0]">
+                                <span className="text-xs md:text-xs truncate opacity-70 text-[#E0E0E0] leading-tight">
                                     {isLoading ? (
                                         <span className="opacity-70">Loading...</span>
                                     ) : error ? (
@@ -393,7 +393,7 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                     )}
                 </div>
 
-                <div className="flex flex-col items-center justify-center md:flex-1 md:w-[40%] md:max-w-[600px]">
+                <div className="flex flex-col items-center justify-center flex-shrink-0 md:flex-1 md:w-[40%] md:max-w-[600px]">
                     <div className="flex items-center gap-4 md:gap-6">
                         <button
                             onClick={toggleShuffle}
@@ -410,13 +410,13 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                             disabled={isLoading}
                             title="Previous"
                         >
-                            <SkipBack size={20} fill="currentColor" strokeWidth={0} />
+                            <SkipBack size={20} className="md:w-5 md:h-5" fill="currentColor" strokeWidth={0} />
                         </button>
 
                         <button
                             onClick={togglePlay}
                             className="
-                                w-12 h-12 md:w-8 md:h-8 bg-white rounded-full
+                                w-10 h-10 md:w-10 md:h-10 bg-white rounded-full
                                 flex items-center justify-center
                                 transition-all hover:scale-105 active:scale-95
                                 text-black shadow-lg
@@ -426,11 +426,11 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                             title={isPlaying ? "Pause" : "Play"}
                         >
                             {isLoading ? (
-                                <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                                <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
                             ) : isPlaying ? (
-                                <Pause size={20} fill="currentColor" strokeWidth={0} />
+                                <Pause size={18} className="md:w-5 md:h-5" fill="currentColor" strokeWidth={0} />
                             ) : (
-                                <Play size={20} fill="currentColor" strokeWidth={0} className="ml-0.5" />
+                                <Play size={18} className="md:w-5 md:h-5 ml-0.5" fill="currentColor" strokeWidth={0} />
                             )}
                         </button>
 
@@ -440,12 +440,12 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                             disabled={isLoading}
                             title="Next"
                         >
-                            <SkipForward size={24} fill="currentColor" strokeWidth={0} className="md:w-5 md:h-5" />
+                            <SkipForward size={20} className="md:w-5 md:h-5" fill="currentColor" strokeWidth={0} />
                         </button>
 
                         <button
                             onClick={toggleRepeat}
-                            className={`transition-all duration-150 relative hover:scale-105 ${repeatMode > 0 ? 'text-primary' : 'text-white/70 hover:text-white'}`}
+                            className={`hidden md:block transition-all duration-150 relative hover:scale-105 ${repeatMode > 0 ? 'text-primary' : 'text-white/70 hover:text-white'}`}
                             disabled={isLoading}
                             title={repeatMode === 0 ? "Repeat" : repeatMode === 1 ? "Repeat All" : "Repeat One"}
                         >

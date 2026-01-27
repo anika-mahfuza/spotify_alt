@@ -351,7 +351,7 @@ function MainContent({
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 overflow-y-auto scrollbar-thin pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-32">
+      <div className="flex-1 overflow-y-auto scrollbar-thin pb-[calc(72px+env(safe-area-inset-bottom))] md:pb-32">
         {showSearchResults ? (
           <div className="px-8 py-6 animate-fadeIn">
             <div className="flex items-center justify-between mb-8">

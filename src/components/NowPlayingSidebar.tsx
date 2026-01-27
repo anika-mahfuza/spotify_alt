@@ -77,14 +77,25 @@ export function NowPlayingSidebar({ currentTrack, artistDetails, onClose, queue 
     };
 
     return (
-        <div
-            ref={sidebarRef}
-            className={`fixed lg:static top-0 right-0 z-[60] h-screen flex flex-col p-5 border-l border-white/5 shadow-elevated backdrop-blur-3xl bg-black/20 ${isResizing ? 'select-none' : ''}`}
-            style={{
-                width: isDesktop ? `${width}px` : '100%',
-                color: textColor,
-            }}
-        >
+        <>
+            {/* Mobile Backdrop */}
+            {!isDesktop && (
+                <div
+                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[55] lg:hidden animate-fadeIn"
+                    onClick={onClose}
+                />
+            )}
+            
+            <div
+                ref={sidebarRef}
+                className={`fixed lg:static top-0 right-0 z-[60] h-screen flex flex-col p-5 border-l border-white/5 shadow-elevated backdrop-blur-3xl bg-black/40 ${isResizing ? 'select-none' : ''} transition-transform duration-300 lg:transition-none ${!isDesktop ? 'translate-x-0' : ''}`}
+                style={{
+                    width: isDesktop ? `${width}px` : '90%',
+                    maxWidth: isDesktop ? undefined : '480px',
+                    paddingBottom: !isDesktop ? 'calc(1.25rem + env(safe-area-inset-bottom))' : undefined,
+                    color: textColor,
+                }}
+            >
             {/* Resize Handle - Desktop Only */}
             <div
                 className="hidden lg:block absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/20 transition-colors z-50 group"
@@ -238,5 +249,6 @@ export function NowPlayingSidebar({ currentTrack, artistDetails, onClose, queue 
                 </div>
             )}
         </div>
+        </>
     );
 }
