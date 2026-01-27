@@ -459,7 +459,7 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
 
                         <button
                             onClick={toggleRepeat}
-                            className={`transition-all duration-150 relative hover:scale-105 ${repeatMode > 0 ? 'text-primary' : 'text-white/70 hover:text-white'}`}
+                            className={`transition-all duration-150 relative hover:scale-105 ${repeatMode > 0 ? 'text-[#1DB954]' : 'text-white/70 hover:text-white'}`}
                             disabled={isLoading}
                             title={repeatMode === 0 ? "Repeat" : repeatMode === 1 ? "Repeat All" : "Repeat One"}
                         >
