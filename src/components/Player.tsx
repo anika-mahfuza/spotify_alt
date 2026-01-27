@@ -363,13 +363,13 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                 }}
             >
                 {/* Track Info */}
-                <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0 max-w-[40%] sm:max-w-[45%] md:max-w-none md:w-[30%] md:flex-none">
+                <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0 max-w-[60%] sm:max-w-[55%] md:max-w-none md:w-[30%] md:flex-none">
                     {currentTrack && (
                         <>
                             <div className="relative group/img flex-shrink-0">
                                 <img
                                     src={currentTrack.image || currentTrack.thumbnail || 'https://via.placeholder.com/56'}
-                                    className="h-12 w-12 md:h-14 md:w-14 object-cover rounded shadow-card"
+                                    className="h-10 w-10 md:h-14 md:w-14 object-cover rounded shadow-card"
                                     alt="Cover"
                                 />
                             </div>

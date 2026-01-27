@@ -189,7 +189,7 @@ function ScrollSection({
     return (
         <section className="mb-6">
             <SectionHeader title={title} />
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-4">
+            <div className="flex overflow-x-auto pb-4 gap-4 snap-x snap-mandatory scrollbar-hide md:grid md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 md:gap-4 md:overflow-visible md:pb-0">
                 {children}
             </div>
         </section>
@@ -791,7 +791,7 @@ export function Home({ activePlaylistId, activeAlbumId, activeArtistId, onTrackS
                                         category.playlists && category.playlists.length > 0 && (
                                             <div key={category.id}>
                                                 <h3 className="text-lg font-bold text-white mb-3">{category.name}</h3>
-                                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-4">
+                                                <div className="flex overflow-x-auto pb-4 gap-4 snap-x snap-mandatory scrollbar-hide md:grid md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 md:gap-4 md:overflow-visible md:pb-0">
                                                     {category.playlists.slice(0, 7).map(playlist => (
                                                         <MediaCard
                                                             key={playlist.id}
@@ -978,7 +978,7 @@ export function Home({ activePlaylistId, activeAlbumId, activeArtistId, onTrackS
                     <div className="px-6 pb-6">
                         {filteredTracks.length > 0 ? (
                             <>
-                                <div className="grid grid-cols-[16px_4fr_3fr_minmax(80px,1fr)] gap-3 px-3 py-2 text-xs font-medium text-text-muted uppercase tracking-wider border-b border-white/10 sticky top-0 bg-black/40 backdrop-blur-2xl z-10 rounded-t-lg">
+                                <div className="grid grid-cols-[16px_1fr_auto] md:grid-cols-[16px_4fr_3fr_minmax(80px,1fr)] gap-3 px-3 py-2 text-xs font-medium text-text-muted uppercase tracking-wider border-b border-white/10 sticky top-0 bg-black/40 backdrop-blur-2xl z-10 rounded-t-lg">
                                     <div className="text-center">#</div>
                                     <div>Title</div>
                                     <div className="hidden md:block">Album</div>
@@ -991,7 +991,7 @@ export function Home({ activePlaylistId, activeAlbumId, activeArtistId, onTrackS
                                     {displayedTracks.map((track, index) => (
                                         <div
                                             key={`${track.id}-${index}`}
-                                            className={`grid grid-cols-[16px_4fr_3fr_minmax(80px,1fr)] gap-3 px-3 py-2 group bg-black/30 hover:bg-black/40 backdrop-blur-md rounded-md cursor-pointer transition-all border border-white/5 hover:border-white/15 ${currentTrack?.id === track.id ? 'bg-black/60 border-white/30' : ''
+                                            className={`grid grid-cols-[16px_1fr_auto] md:grid-cols-[16px_4fr_3fr_minmax(80px,1fr)] gap-3 px-3 py-2 group bg-black/30 hover:bg-black/40 backdrop-blur-md rounded-md cursor-pointer transition-all border border-white/5 hover:border-white/15 ${currentTrack?.id === track.id ? 'bg-black/60 border-white/30' : ''
                                                 }`}
                                             onClick={() => handleTrackClick(track)}
                                             onMouseEnter={() => setHoveredTrack(track.id)}
