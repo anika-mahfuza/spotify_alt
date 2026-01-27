@@ -331,14 +331,15 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
             
             <div
                 className="
-                    fixed bottom-0 left-0 right-0 h-[72px] md:h-24
+                    fixed bottom-0 left-0 right-0 
+                    h-[130px] md:h-24
                     border-t border-white/5
                     z-[100]
                     flex flex-col justify-end pb-0
                     bg-black/95 backdrop-blur-xl
                 "
                 style={{
-                    height: 'calc(72px + env(safe-area-inset-bottom))',
+                    height: 'calc(130px + env(safe-area-inset-bottom))',
                     paddingBottom: 'env(safe-area-inset-bottom)',
                 }}
             >
@@ -349,7 +350,8 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                 }}
             />
 
-            <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/10 md:hidden z-20">
+            {/* Mobile Progress Bar (Thin Top Line) - Hidden now as we have full controls */}
+            <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/10 hidden z-20">
                  <div 
                     className="h-full bg-white transition-all duration-300"
                     style={{ width: `${progress}%` }}
@@ -357,29 +359,29 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
             </div>
 
             <div
-                className={`relative z-10 flex items-center justify-between h-full px-2 md:px-6 transition-all duration-300 gap-2 md:gap-0`}
+                className={`relative z-10 flex flex-col md:flex-row items-center justify-between h-full px-4 md:px-6 py-2 md:py-0 transition-all duration-300 gap-1 md:gap-0`}
                 style={{
                     paddingRight: isSidebarOpen && isLargeScreen ? `${sidebarWidth + 24}px` : undefined
                 }}
             >
                 {/* Track Info */}
-                <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0 md:max-w-none md:w-[30%] md:flex-none">
+                <div className="flex items-center gap-3 w-full md:w-[30%] md:flex-none justify-start border-b border-white/5 md:border-none pb-2 md:pb-0">
                     {currentTrack && (
                         <>
                             <div className="relative group/img flex-shrink-0">
                                 <img
                                     src={currentTrack.image || currentTrack.thumbnail || 'https://via.placeholder.com/56'}
-                                    className="h-10 w-10 md:h-14 md:w-14 object-cover rounded shadow-card"
+                                    className="h-12 w-12 md:h-14 md:w-14 object-cover rounded shadow-card"
                                     alt="Cover"
                                 />
                             </div>
                             <div className="flex flex-col justify-center overflow-hidden min-w-0">
                                 <span
-                                    className="text-sm md:text-sm font-medium truncate hover:underline cursor-pointer text-white leading-tight"
+                                    className="text-sm font-medium truncate hover:underline cursor-pointer text-white leading-tight"
                                 >
                                     {currentTrack.name || "No Title"}
                                 </span>
-                                <span className="text-xs md:text-xs truncate opacity-70 text-[#E0E0E0] leading-tight">
+                                <span className="text-xs truncate opacity-70 text-[#E0E0E0] leading-tight mt-0.5">
                                     {isLoading ? (
                                         <span className="opacity-70">Loading...</span>
                                     ) : error ? (
@@ -393,11 +395,12 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                     )}
                 </div>
 
-                <div className="flex flex-col items-center justify-center flex-shrink-0 md:flex-1 md:w-[40%] md:max-w-[600px]">
-                    <div className="flex items-center gap-4 md:gap-6">
+                {/* Controls */}
+                <div className="flex flex-col items-center justify-center w-full md:flex-1 md:w-[40%] md:max-w-[600px] gap-1">
+                    <div className="flex items-center justify-between w-full md:justify-center md:gap-6 px-2 md:px-0">
                         <button
                             onClick={toggleShuffle}
-                            className={`hidden md:block transition-all duration-150 ${isShuffle ? 'text-[#1DB954]' : 'text-white/70 hover:text-white'}`}
+                            className={`transition-all duration-150 ${isShuffle ? 'text-[#1DB954]' : 'text-white/70 hover:text-white'}`}
                             disabled={isLoading}
                             title="Shuffle"
                         >
@@ -416,7 +419,7 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                         <button
                             onClick={togglePlay}
                             className="
-                                w-10 h-10 md:w-10 md:h-10 bg-white rounded-full
+                                w-8 h-8 md:w-10 md:h-10 bg-white rounded-full
                                 flex items-center justify-center
                                 transition-all hover:scale-105 active:scale-95
                                 text-black shadow-lg
@@ -426,11 +429,11 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                             title={isPlaying ? "Pause" : "Play"}
                         >
                             {isLoading ? (
-                                <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                                <div className="w-3 h-3 md:w-4 md:h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
                             ) : isPlaying ? (
-                                <Pause size={18} className="md:w-5 md:h-5" fill="currentColor" strokeWidth={0} />
+                                <Pause size={16} className="md:w-5 md:h-5" fill="currentColor" strokeWidth={0} />
                             ) : (
-                                <Play size={18} className="md:w-5 md:h-5 ml-0.5" fill="currentColor" strokeWidth={0} />
+                                <Play size={16} className="md:w-5 md:h-5 ml-0.5" fill="currentColor" strokeWidth={0} />
                             )}
                         </button>
 
@@ -445,7 +448,7 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
 
                         <button
                             onClick={toggleRepeat}
-                            className={`hidden md:block transition-all duration-150 relative hover:scale-105 ${repeatMode > 0 ? 'text-primary' : 'text-white/70 hover:text-white'}`}
+                            className={`transition-all duration-150 relative hover:scale-105 ${repeatMode > 0 ? 'text-primary' : 'text-white/70 hover:text-white'}`}
                             disabled={isLoading}
                             title={repeatMode === 0 ? "Repeat" : repeatMode === 1 ? "Repeat All" : "Repeat One"}
                         >
@@ -467,8 +470,9 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                         )}
                     </div>
 
-                    <div className="hidden md:flex items-center gap-2 w-full text-xs text-white/70">
-                        <span className="min-w-[40px] text-right tabular-nums">{formatTime(currentTime)}</span>
+                    {/* Progress Bar - Visible on Mobile now */}
+                    <div className="flex items-center gap-2 w-full text-xs text-white/70">
+                        <span className="min-w-[35px] text-right tabular-nums text-[10px] md:text-xs">{formatTime(currentTime)}</span>
                         <div className="flex-1 h-1 rounded-full relative group cursor-pointer bg-white/20">
                             <div
                                 className="absolute top-0 left-0 h-full rounded-full transition-all bg-white group-hover:bg-primary"
@@ -486,7 +490,7 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                                 disabled={isLoading}
                             />
                         </div>
-                        <span className="min-w-[40px] tabular-nums">{formatTime(duration)}</span>
+                        <span className="min-w-[35px] tabular-nums text-[10px] md:text-xs">{formatTime(duration)}</span>
                     </div>
                 </div>
 
