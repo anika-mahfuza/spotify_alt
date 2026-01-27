@@ -288,8 +288,9 @@ async def stream(video_id: str):
         
         # Stream with proper headers to avoid YouTube blocking
         async def iterfile():
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            # Use headers from extraction if available, otherwise fallback to standard
+            headers = stream_info.get('http_headers') or {
+                'User-Agent': USER_AGENT,
                 'Accept': '*/*',
                 'Accept-Language': 'en-US,en;q=0.9',
                 'Referer': 'https://www.youtube.com/',
@@ -298,6 +299,10 @@ async def stream(video_id: str):
                 'Sec-Fetch-Mode': 'no-cors',
                 'Sec-Fetch-Site': 'cross-site',
             }
+            
+            # Ensure User-Agent matches extraction
+            if 'User-Agent' not in headers:
+                headers['User-Agent'] = USER_AGENT
             
             retry_count = 0
             max_retries = 2

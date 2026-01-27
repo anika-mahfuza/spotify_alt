@@ -1,4 +1,4 @@
-yt-dlp
+yt-dlp>=2024.04.09
 fastapi
 uvicorn
 python-multipart
