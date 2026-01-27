@@ -307,49 +307,76 @@ async def stream(video_id: str):
             if 'User-Agent' not in headers:
                 headers['User-Agent'] = USER_AGENT
             
-            retry_count = 0
-            max_retries = 2
             current_url = url
+            yielded_bytes = 0
+            consecutive_errors = 0
+            max_consecutive_errors = 3
+            chunk_size = 128 * 1024
             
-            while retry_count <= max_retries:
+            while True:
+                # Prepare headers for resume if needed
+                request_headers = headers.copy()
+                if yielded_bytes > 0:
+                    request_headers['Range'] = f'bytes={yielded_bytes}-'
+                    logger.info(f"Resuming stream for {video_id} from byte {yielded_bytes}")
+
                 try:
-                    async with httpx.AsyncClient(timeout=20.0, follow_redirects=True, headers=headers) as client:
+                    async with httpx.AsyncClient(timeout=20.0, follow_redirects=True, headers=request_headers) as client:
                         async with client.stream("GET", current_url) as r:
-                            if r.status_code == 403:
-                                logger.warning(f"YouTube 403 error for {video_id}, attempt {retry_count + 1}/{max_retries + 1}")
+                            
+                            # Handle 403/410 (Gone/Forbidden) -> Refresh URL
+                            if r.status_code in (403, 410):
+                                logger.warning(f"Stream {r.status_code} at {yielded_bytes} bytes for {video_id}")
                                 
-                                if retry_count < max_retries:
-                                    # URL expired or blocked - re-extract
-                                    logger.info(f"Re-extracting URL for {video_id}")
-                                    cache.delete(f"stream:{video_id}")  # Clear cache
+                                if consecutive_errors >= max_consecutive_errors:
+                                    logger.error(f"Max retries ({max_consecutive_errors}) reached for URL refresh")
+                                    raise HTTPException(status_code=403, detail="Stream blocked/expired and refresh failed")
+
+                                # Refresh URL
+                                logger.info(f"Re-extracting URL for {video_id}")
+                                cache.delete(f"stream:{video_id}")
+                                try:
                                     fresh_info = extract_audio_url(video_id)
                                     current_url = fresh_info.get('url')
-                                    
                                     if not current_url:
-                                        raise HTTPException(status_code=500, detail="Failed to get fresh URL")
+                                        raise Exception("Failed to get fresh URL")
                                     
-                                    retry_count += 1
-                                    continue  # Retry with new URL
-                                else:
-                                    raise HTTPException(status_code=403, detail="YouTube blocked the request")
-                            
+                                    consecutive_errors += 1
+                                    continue # Retry with new URL and same offset
+                                except Exception as e:
+                                    logger.error(f"Failed to refresh URL: {e}")
+                                    consecutive_errors += 1
+                                    await asyncio.sleep(1)
+                                    continue
+
                             r.raise_for_status()
                             
-                            # Success - stream the audio
-                            async for chunk in r.aiter_bytes(chunk_size=128*1024):
+                            # Reset error counter on successful connection
+                            consecutive_errors = 0
+                            
+                            # Stream the content
+                            async for chunk in r.aiter_bytes(chunk_size=chunk_size):
                                 yield chunk
-                            
-                            break  # Success, exit loop
-                            
-                except httpx.HTTPStatusError as e:
-                    if e.response.status_code == 403 and retry_count < max_retries:
-                        retry_count += 1
-                        logger.warning(f"Retry {retry_count} for {video_id} due to 403")
-                        await asyncio.sleep(1)  # Wait before retry
-                        continue
-                    raise
+                                yielded_bytes += len(chunk)
+                                
+                            # If we get here naturally, the stream is done
+                            break
+
+                except (httpx.RequestError, httpx.StreamError) as e:
+                    # Catches ReadError, ConnectError, ProtocolError, etc.
+                    logger.warning(f"Stream interrupted at {yielded_bytes} bytes for {video_id}: {e}")
+                    consecutive_errors += 1
+                    
+                    if consecutive_errors > max_consecutive_errors:
+                        logger.error(f"Max streaming retries reached for {video_id}")
+                        # We cannot raise an HTTPException here effectively if headers are already sent
+                        # But raising an exception will close the stream on client side
+                        raise 
+                    
+                    await asyncio.sleep(1) # Backoff before retry
+                    continue
                 except Exception as e:
-                    logger.error(f"Stream error for {video_id}: {str(e)}")
+                    logger.error(f"Unexpected stream error for {video_id}: {e}")
                     raise
 
         return StreamingResponse(iterfile(), media_type="audio/mp4")
