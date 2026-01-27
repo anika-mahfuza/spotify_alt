@@ -332,7 +332,7 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
             <div
                 className="
                     fixed bottom-0 left-0 right-0 
-                    h-auto min-h-[112px] md:h-24 md:min-h-0
+                    h-auto min-h-[140px] md:h-24 md:min-h-0
                     border-t border-white/5
                     z-[100]
                     flex flex-col justify-end pb-0
@@ -494,8 +494,8 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                     </div>
                 </div>
 
-                {/* Right Controls (Volume etc) - Hidden on mobile as requested */}
-                <div className="hidden md:flex items-center justify-end w-[30%] min-w-[140px] gap-2">
+                {/* Right Controls (Volume etc) - Bottom row on mobile */}
+                <div className="flex items-center justify-start md:justify-end w-full md:w-[30%] min-w-[140px] gap-2 px-4 md:px-0 pb-2 md:pb-0">
                     <button
                         onClick={toggleMute}
                         className="transition-all text-white/70 hover:text-white"
