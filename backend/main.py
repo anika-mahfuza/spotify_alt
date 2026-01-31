@@ -114,8 +114,7 @@ YTDL_OPTS = {
     "verbose": True,
     "extractor_args": {
         "youtube": {
-            "formats": "missing_pot",
-            "player_client": ["web", "android"],
+            "player_client": ["android", "web"],
         }
     },
     "http_headers": {

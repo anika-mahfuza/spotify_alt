@@ -14,6 +14,7 @@ import { Track, Artist } from './types';
 import { Music } from 'lucide-react';
 import { extractDominantColor, normalizeAccentColor, setAccentColor } from './utils/colorExtractor';
 import { DynamicBackground } from './components/DynamicBackground';
+import { Spotlight } from './components/Spotlight';
 import './index.css';
 import './App.css';
 import './styles/global.css';
@@ -31,106 +32,85 @@ function Login() {
   const { login } = useAuth();
 
   return (
-    <div className="min-h-screen w-full text-white flex flex-col relative z-50" style={{ backgroundColor: '#000000' }}>
-      {/* Navigation */}
-      <nav className="w-full px-4 md:px-8 py-4 md:py-6 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-           <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center">
-             <Music size={16} className="text-black" strokeWidth={3} />
-           </div>
-           <span className="text-lg md:text-xl font-bold tracking-tight">Spotify Alt</span>
+    <Spotlight className="min-h-screen w-full bg-[#0a0a0f] text-white flex flex-col">
+      {/* Logo - Minimal */}
+      <div className="absolute top-0 left-0 p-8 md:p-12 z-20">
+        <div className="flex items-center gap-3 opacity-0 animate-fade-in" style={{ animationDelay: '0.2s', animationFillMode: 'forwards' }}>
+          <div className="w-10 h-10 bg-white/10 backdrop-blur-sm rounded-full flex items-center justify-center border border-white/10">
+            <Music size={20} className="text-white" strokeWidth={2.5} />
+          </div>
+          <span className="text-xl font-semibold tracking-tight text-white/90">Spotify Alt</span>
         </div>
-        <div className="flex items-center gap-4 md:gap-6 text-sm font-medium text-zinc-400">
-           <a href="#" className="hidden md:block hover:text-white transition-colors">Premium</a>
-           <a href="#" className="hidden md:block hover:text-white transition-colors">Support</a>
-           <a href="#" className="hidden md:block hover:text-white transition-colors">Download</a>
-           <div className="hidden md:block w-px h-4 bg-zinc-800"></div>
-           <a href="#" className="hidden md:block hover:text-white transition-colors">Sign up</a>
-           <button onClick={login} className="hover:text-white transition-colors">Log in</button>
-        </div>
-      </nav>
+      </div>
 
-      {/* Hero Section */}
-      <main className="flex-1 flex flex-col items-center justify-center text-center px-4 relative z-10 pb-20">
-        <h1 className="text-4xl md:text-7xl font-bold tracking-tighter mb-6 max-w-4xl leading-tight">
-           Music for everyone.
+      {/* Main Content - Centered */}
+      <main className="flex-1 flex flex-col items-center justify-center text-center px-6 relative z-10 min-h-screen pt-20 pb-20">
+        {/* Headline */}
+        <h1 
+          className="text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight mb-6 max-w-5xl leading-[1.1] opacity-0 animate-slide-up"
+          style={{ animationDelay: '0.5s', animationFillMode: 'forwards' }}
+        >
+          <span className="text-white">Don't just listen.</span>
+          <br />
+          <span className="text-white/40 italic font-light">Feel</span>
+          <span className="text-white"> it.</span>
         </h1>
-        <p className="text-lg md:text-xl text-zinc-400 mb-10 max-w-2xl font-medium">
-           Millions of songs. No credit card needed.
+
+        {/* Subheadline */}
+        <p 
+          className="text-lg md:text-xl text-white/50 mb-12 max-w-xl font-normal leading-relaxed opacity-0 animate-slide-up"
+          style={{ animationDelay: '0.6s', animationFillMode: 'forwards' }}
+        >
+          Millions of tracks. One seamless experience.
+          <br className="hidden md:block" />
+          No compromises.
         </p>
 
+        {/* Login Button */}
         <button
           onClick={login}
-          className="
-            group
-            bg-[#1DB954] hover:bg-[#1ed760]
-            text-black font-bold
-            py-3.5 px-8 rounded-full
-            text-base
-            transition-all duration-300
-            transform hover:scale-[1.02] active:scale-[0.98]
-            flex items-center gap-3
-          "
+          className="group relative opacity-0 animate-scale-in"
+          style={{ animationDelay: '0.7s', animationFillMode: 'forwards' }}
         >
-          <span>GET SPOTIFY FREE</span>
+          {/* Glow effect */}
+          <div className="absolute -inset-1 bg-gradient-to-r from-blue-600/20 via-purple-600/20 to-blue-600/20 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+          
+          <div className="relative flex items-center gap-3 bg-white text-black font-semibold py-4 px-10 rounded-full text-base transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] hover:shadow-[0_0_40px_rgba(255,255,255,0.3)]">
+            <span>Continue with Spotify</span>
+            <svg 
+              className="w-5 h-5 transition-transform duration-300 group-hover:translate-x-1" 
+              fill="none" 
+              viewBox="0 0 24 24" 
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
+          </div>
         </button>
 
-        {/* Feature Grid (Public Info) */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mt-24 max-w-5xl text-left">
-           <div className="space-y-3">
-              <div className="w-12 h-12 rounded-full bg-zinc-900 flex items-center justify-center mb-4">
-                 <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" /></svg>
-              </div>
-              <h3 className="text-lg font-bold">Play your favorites.</h3>
-              <p className="text-zinc-400 text-sm leading-relaxed">
-                 Listen to the songs you love, and discover new music and podcasts.
-              </p>
-           </div>
-           
-           <div className="space-y-3">
-              <div className="w-12 h-12 rounded-full bg-zinc-900 flex items-center justify-center mb-4">
-                 <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
-              </div>
-              <h3 className="text-lg font-bold">Playlists made easy.</h3>
-              <p className="text-zinc-400 text-sm leading-relaxed">
-                 We'll help you make playlists. Or enjoy playlists made by music experts.
-              </p>
-           </div>
-
-           <div className="space-y-3">
-              <div className="w-12 h-12 rounded-full bg-zinc-900 flex items-center justify-center mb-4">
-                 <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
-              </div>
-              <h3 className="text-lg font-bold">Make it yours.</h3>
-              <p className="text-zinc-400 text-sm leading-relaxed">
-                 Tell us what you like, and we'll recommend music for you.
-              </p>
-           </div>
+        {/* Optional: Subtle feature hints */}
+        <div 
+          className="flex flex-wrap items-center justify-center gap-4 mt-16 opacity-0 animate-fade-in"
+          style={{ animationDelay: '0.9s', animationFillMode: 'forwards' }}
+        >
+          {['Ad-free', 'High Quality', 'Offline Mode'].map((feature) => (
+            <div key={feature} className="flex items-center gap-2 text-sm text-white/30">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              <span>{feature}</span>
+            </div>
+          ))}
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="w-full bg-black py-12 px-8 border-t border-zinc-900">
-         <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
-            <div className="flex items-center gap-2">
-               <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center">
-                 <Music size={12} className="text-black" strokeWidth={3} />
-               </div>
-               <span className="text-lg font-bold tracking-tight">Spotify Alt</span>
-            </div>
-            <div className="flex flex-wrap gap-8 text-xs font-bold text-zinc-400 uppercase tracking-widest">
-               <a href="#" className="hover:text-[#1DB954] transition-colors">Legal</a>
-               <a href="#" className="hover:text-[#1DB954] transition-colors">Privacy Center</a>
-               <a href="#" className="hover:text-[#1DB954] transition-colors">Privacy Policy</a>
-               <a href="#" className="hover:text-[#1DB954] transition-colors">Cookies</a>
-               <a href="#" className="hover:text-[#1DB954] transition-colors">About Ads</a>
-            </div>
-            <p className="text-xs text-zinc-500">
-               © 2025 Spotify Alt AB
-            </p>
-         </div>
+      {/* Minimal Footer */}
+      <footer className="w-full py-6 px-8 text-center opacity-0 animate-fade-in" style={{ animationDelay: '1s', animationFillMode: 'forwards' }}>
+        <p className="text-xs text-white/20">
+          By continuing, you agree to our Terms of Service and Privacy Policy
+        </p>
       </footer>
-    </div>
+    </Spotlight>
   );
 }
 

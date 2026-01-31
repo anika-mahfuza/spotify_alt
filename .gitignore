@@ -31,4 +31,6 @@ dist-ssr
 backend/.env.production
 cookies.txt
 backend/cookies.txt
+nul
+
 

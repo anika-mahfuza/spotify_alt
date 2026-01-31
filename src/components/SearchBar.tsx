@@ -229,27 +229,27 @@ export const SearchBar = ({ onSearch, isLoading, value, onChange, showHomeButton
           {showUserMenu && (
             <div className="
               absolute top-full right-0 mt-2 w-52
-              bg-white/10 backdrop-blur-2xl rounded-xl overflow-hidden
-              shadow-elevated border border-white/20
+              bg-[#1a1a1a] backdrop-blur-2xl rounded-xl overflow-hidden
+              shadow-elevated border border-white/10
               animate-scaleIn z-50
             ">
-              <div className="px-4 py-2.5 border-b border-white/10">
+              <div className="px-4 py-3 border-b border-white/10 bg-[#242424]">
                 <p className="text-white font-medium text-sm truncate">
                   {isUserProfileLoading ? '...' : (userProfile?.display_name || 'Account')}
                 </p>
                 {userProfile?.email && (
-                  <p className="text-text-muted text-xs truncate">
+                  <p className="text-text-muted text-xs truncate mt-0.5">
                     {userProfile.email}
                   </p>
                 )}
                 {userProfile?.product && (
-                  <p className="text-primary text-xs mt-0.5 capitalize">
+                  <p className="text-primary text-xs mt-1 capitalize font-medium">
                     {userProfile.product}
                   </p>
                 )}
               </div>
 
-              <div className="py-1.5">
+              <div className="py-1">
                 {userProfile?.external_urls?.spotify && (
                   <a
                     href={userProfile.external_urls.spotify}
@@ -257,8 +257,8 @@ export const SearchBar = ({ onSearch, isLoading, value, onChange, showHomeButton
                     rel="noopener noreferrer"
                     onClick={() => setShowUserMenu(false)}
                     className="
-                      w-full flex items-center gap-2.5 px-4 py-2
-                      hover:bg-white/10 transition-colors
+                      w-full flex items-center gap-2.5 px-4 py-2.5
+                      hover:bg-white/5 transition-colors
                       text-text-secondary hover:text-white
                     "
                   >
@@ -275,8 +275,8 @@ export const SearchBar = ({ onSearch, isLoading, value, onChange, showHomeButton
                     setShowUserMenu(false);
                   }}
                   className="
-                    w-full flex items-center gap-2.5 px-4 py-2
-                    hover:bg-white/10 transition-colors
+                    w-full flex items-center gap-2.5 px-4 py-2.5
+                    hover:bg-white/5 transition-colors
                     text-text-secondary hover:text-white
                   "
                 >
