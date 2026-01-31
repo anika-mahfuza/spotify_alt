@@ -12,7 +12,7 @@ import { ResultList } from './components/ResultList';
 import { config } from './config';
 import { Track, Artist } from './types';
 import { Music } from 'lucide-react';
-import { extractDominantColor, getTextColor, setAccentColor, hexToRgb } from './utils/colorExtractor';
+import { extractDominantColor, normalizeAccentColor, setAccentColor } from './utils/colorExtractor';
 import { DynamicBackground } from './components/DynamicBackground';
 import './index.css';
 import './App.css';
@@ -333,7 +333,7 @@ function MainContent({
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden relative z-10">
       {/* Search Bar Header */}
-      <div className="sticky top-0 z-20 px-6 py-4 border-b border-white/5 bg-black/95 backdrop-blur-md">
+      <div className="sticky top-0 z-20 px-6 py-4 border-b border-white/10 bg-black/30 backdrop-blur-3xl">
         <SearchBar
           value={searchQuery}
           onChange={(val) => {
@@ -438,32 +438,27 @@ function MainLayout() {
   const [artistDetails, setArtistDetails] = useState<Artist | null>(null);
   const [queue, setQueue] = useState<Track[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [textColor, setTextColor] = useState('#ffffff');
-
   // Extract colors from current track (Hazy-style)
   useEffect(() => {
     const extractColors = async () => {
       if (!currentTrack) {
         setAccentColor('#ffffff'); // White as default
-        setTextColor('#000000');
         return;
       }
 
       const imageUrl = currentTrack.image || currentTrack.thumbnail;
       if (!imageUrl) {
         setAccentColor('#ffffff');
-        setTextColor('#000000');
         return;
       }
 
       try {
         const hexColor = await extractDominantColor(imageUrl);
-        setAccentColor(hexColor);
-        setTextColor(getTextColor(hexToRgb(hexColor)));
+        const safeColor = normalizeAccentColor(hexColor);
+        setAccentColor(safeColor);
       } catch (error) {
         console.error('Failed to extract colors:', error);
         setAccentColor('#ffffff');
-        setTextColor('#000000');
       }
     };
     extractColors();
@@ -531,7 +526,6 @@ function MainLayout() {
           currentIndex={currentIndex}
           onSelectQueueIndex={handleSelectQueueIndex}
           onRemoveFromQueue={handleRemoveFromQueue}
-          textColor={textColor}
           width={sidebarWidth}
           setWidth={setSidebarWidth}
         />

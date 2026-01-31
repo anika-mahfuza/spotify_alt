@@ -33,6 +33,33 @@ const rgbToHex = (r: number, g: number, b: number): string => {
   return "#" + [r, g, b].map(x => x.toString(16).padStart(2, "0")).join("");
 };
 
+const clamp = (value: number, min: number, max: number): number => {
+  return Math.min(max, Math.max(min, value));
+};
+
+const getLuminance = (r: number, g: number, b: number): number => {
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+};
+
+export const normalizeAccentColor = (hex: string, minLuminance = 0.45): string => {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!result) return hex;
+
+  const r = parseInt(result[1], 16);
+  const g = parseInt(result[2], 16);
+  const b = parseInt(result[3], 16);
+  const luminance = getLuminance(r, g, b);
+
+  if (luminance >= minLuminance) return hex;
+
+  const blend = clamp((minLuminance - luminance) / (1 - luminance), 0, 0.6);
+  const nr = Math.round(r + (255 - r) * blend);
+  const ng = Math.round(g + (255 - g) * blend);
+  const nb = Math.round(b + (255 - b) * blend);
+
+  return rgbToHex(nr, ng, nb);
+};
+
 /**
  * Find the most prominent color from a list of RGB values (inspired by Hazy theme)
  * Now prioritizes saturation over raw frequency
@@ -171,7 +198,7 @@ export const getTextColor = (rgb: string): string => {
   const [r, g, b] = match.map(Number);
   
   // Calculate relative luminance
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  const luminance = getLuminance(r, g, b);
   
   return luminance > 0.5 ? '#000000' : '#FFFFFF';
 };

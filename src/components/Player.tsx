@@ -333,19 +333,19 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                 className="
                     fixed bottom-0 left-0 right-0 
                     h-auto min-h-[140px] md:h-24 md:min-h-0
-                    border-t border-white/5
+                    border-t border-white/10
                     z-[100]
                     flex flex-col justify-end pb-0
-                    bg-black/95 backdrop-blur-xl
+                    bg-black/30 backdrop-blur-3xl
                 "
                 style={{
                     paddingBottom: 'env(safe-area-inset-bottom)',
                 }}
             >
             <div
-                className="absolute inset-0 opacity-20 pointer-events-none"
+                className="absolute inset-0 opacity-10 pointer-events-none"
                 style={{
-                    background: `linear-gradient(to top, #000000, transparent)`,
+                    background: `linear-gradient(to top, rgba(0,0,0,0.3), transparent)`,
                 }}
             />
 
@@ -468,6 +468,18 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                                 <span className="absolute -top-1 left-1/2 -translate-x-1/2 text-[8px] font-bold">1</span>
                             )}
                         </button>
+
+                        {/* Now Playing Toggle - moved near player controls */}
+                        {onToggleNowPlaying && (
+                            <button
+                                onClick={onToggleNowPlaying}
+                                className="hidden md:block transition-all text-white/60 hover:text-white"
+                                title="Now Playing"
+                                disabled={isLoading}
+                            >
+                                <Music size={18} strokeWidth={2} />
+                            </button>
+                        )}
                     </div>
 
                     {/* Progress Bar */}
@@ -522,17 +534,6 @@ export function Player({ currentTrack, nextTrack, onNext, onPrev, backendUrl, is
                         />
                     </div>
 
-                    {/* Desktop Now Playing Toggle */}
-                    {onToggleNowPlaying && (
-                        <button
-                            onClick={onToggleNowPlaying}
-                            className="hidden md:block transition-all text-white/60 hover:text-white"
-                            title="Now Playing"
-                            disabled={isLoading}
-                        >
-                            <Music size={18} strokeWidth={2} />
-                        </button>
-                    )}
                 </div>
             </div>
             </div>

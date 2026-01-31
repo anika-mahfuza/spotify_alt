@@ -62,7 +62,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
 
             <div
                 className={`
-                    flex flex-col z-[200] border-r border-white/10 transition-all duration-300 bg-black/20 backdrop-blur-lg
+                    flex flex-col z-[200] border-r border-white/10 transition-all duration-300 bg-transparent
                     fixed inset-y-0 left-0 w-72
                     md:static md:translate-x-0
                     ${isOpen ? 'translate-x-0' : '-translate-x-full'}
@@ -119,7 +119,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                     Playlists
                 </h2>
                 {playlists.length > 0 && (
-                    <span className="text-xs text-text-muted bg-bg-secondary px-2 py-0.5 rounded-full">
+                    <span className="text-xs text-text-muted bg-black/30 px-2 py-0.5 rounded-full">
                         {playlists.length}
                     </span>
                 )}
@@ -130,17 +130,17 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                     <div className="flex flex-col gap-2 px-2">
                         {[...Array(6)].map((_, i) => (
                             <div key={i} className="flex items-center gap-3 p-2 animate-pulse">
-                                <div className="w-10 h-10 bg-bg-secondary rounded" />
+                                <div className="w-10 h-10 bg-black/30 rounded" />
                                 <div className="flex-1">
-                                    <div className="h-3.5 bg-bg-secondary rounded w-3/4 mb-1.5" />
-                                    <div className="h-3 bg-bg-secondary rounded w-1/2" />
+                                    <div className="h-3.5 bg-black/30 rounded w-3/4 mb-1.5" />
+                                    <div className="h-3 bg-black/30 rounded w-1/2" />
                                 </div>
                             </div>
                         ))}
                     </div>
                 ) : playlists.length === 0 ? (
                     <div className="px-4 py-6 text-center">
-                        <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-bg-secondary flex items-center justify-center">
+                        <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-black/30 flex items-center justify-center">
                             <Music size={22} className="text-text-muted" />
                         </div>
                         <p className="text-text-muted text-sm">

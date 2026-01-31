@@ -17,33 +17,33 @@ export { AuthContext };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [token, setToken] = useState<string | null>(() => {
-        const saved = sessionStorage.getItem('spotify_token');
+        const saved = localStorage.getItem('spotify_token');
         if (saved) return saved;
 
         const urlParams = new URLSearchParams(window.location.search);
         const tokenFromUrl = urlParams.get('token');
         if (tokenFromUrl) {
-            sessionStorage.setItem('spotify_token', tokenFromUrl);
+            localStorage.setItem('spotify_token', tokenFromUrl);
             return tokenFromUrl;
         }
         return null;
     });
 
     const [refreshToken, setRefreshToken] = useState<string | null>(() => {
-        const saved = sessionStorage.getItem('spotify_refresh_token');
+        const saved = localStorage.getItem('spotify_refresh_token');
         if (saved) return saved;
 
         const urlParams = new URLSearchParams(window.location.search);
         const tokenFromUrl = urlParams.get('refresh_token');
         if (tokenFromUrl) {
-            sessionStorage.setItem('spotify_refresh_token', tokenFromUrl);
+            localStorage.setItem('spotify_refresh_token', tokenFromUrl);
             return tokenFromUrl;
         }
         return null;
     });
 
     const [expiresAt, setExpiresAt] = useState<number | null>(() => {
-        const saved = sessionStorage.getItem('spotify_token_expires_at');
+        const saved = localStorage.getItem('spotify_token_expires_at');
         if (saved) return parseInt(saved, 10);
 
         const urlParams = new URLSearchParams(window.location.search);
@@ -52,7 +52,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             // Calculate expiration time (current time + expires_in seconds)
             // Subtract a small buffer (e.g., 60 seconds) to refresh before actual expiration
             const expirationTime = Date.now() + (parseInt(expiresIn, 10) * 1000);
-            sessionStorage.setItem('spotify_token_expires_at', expirationTime.toString());
+            localStorage.setItem('spotify_token_expires_at', expirationTime.toString());
             return expirationTime;
         }
         return null;
@@ -67,22 +67,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setExpiresAt(null);
         setUserProfile(null);
         setIsUserProfileLoading(false);
-        sessionStorage.removeItem('spotify_token');
-        sessionStorage.removeItem('spotify_refresh_token');
-        sessionStorage.removeItem('spotify_token_expires_at');
         
-        // Clear all session storage to ensure fresh login
-        sessionStorage.clear();
-        
-        // Clear all localStorage except theme preferences
-        const keysToRemove = [];
-        for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key && !key.includes('theme')) {
-                keysToRemove.push(key);
-            }
-        }
-        keysToRemove.forEach(key => localStorage.removeItem(key));
+        // Clear auth data from localStorage
+        localStorage.removeItem('spotify_token');
+        localStorage.removeItem('spotify_refresh_token');
+        localStorage.removeItem('spotify_token_expires_at');
     }, []);
 
     const login = () => {
@@ -105,7 +94,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         const refresh = async () => {
             try {
-                const apiUrl = import.meta.env?.VITE_API_URL || 'http://localhost:11700';
+                const apiUrl = import.meta.env?.VITE_API_URL || 'http://127.0.0.1:11700';
                 const response = await fetch(`${apiUrl}/refresh-token?refresh_token=${refreshToken}`);
                 
                 if (!response.ok) {
@@ -116,17 +105,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 
                 if (data.access_token) {
                     setToken(data.access_token);
-                    sessionStorage.setItem('spotify_token', data.access_token);
+                    localStorage.setItem('spotify_token', data.access_token);
                     
                     if (data.expires_in) {
                         const newExpiresAt = Date.now() + (data.expires_in * 1000);
                         setExpiresAt(newExpiresAt);
-                        sessionStorage.setItem('spotify_token_expires_at', newExpiresAt.toString());
+                        localStorage.setItem('spotify_token_expires_at', newExpiresAt.toString());
                     }
                     
                     if (data.refresh_token) {
                         setRefreshToken(data.refresh_token);
-                        sessionStorage.setItem('spotify_refresh_token', data.refresh_token);
+                        localStorage.setItem('spotify_refresh_token', data.refresh_token);
                     }
                 }
             } catch (error) {
@@ -175,22 +164,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
             const data = await response.json();
             
-            if (data.access_token) {
-                setToken(data.access_token);
-                sessionStorage.setItem('spotify_token', data.access_token);
-                
-                if (data.expires_in) {
-                    const newExpiresAt = Date.now() + (data.expires_in * 1000);
-                    setExpiresAt(newExpiresAt);
-                    sessionStorage.setItem('spotify_token_expires_at', newExpiresAt.toString());
+                if (data.access_token) {
+                    setToken(data.access_token);
+                    localStorage.setItem('spotify_token', data.access_token);
+
+                    if (data.expires_in) {
+                        const newExpiresAt = Date.now() + (data.expires_in * 1000);
+                        setExpiresAt(newExpiresAt);
+                        localStorage.setItem('spotify_token_expires_at', newExpiresAt.toString());
+                    }
+
+                    if (data.refresh_token) {
+                        setRefreshToken(data.refresh_token);
+                        localStorage.setItem('spotify_refresh_token', data.refresh_token);
+                    }
+                    return data.access_token;
                 }
-                
-                if (data.refresh_token) {
-                    setRefreshToken(data.refresh_token);
-                    sessionStorage.setItem('spotify_refresh_token', data.refresh_token);
-                }
-                return data.access_token;
-            }
         } catch (error) {
             console.error("Error refreshing token:", error);
             logout();

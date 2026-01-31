@@ -56,7 +56,7 @@ function MediaCard({
 }) {
     return (
         <div
-            className="group bg-black/30 hover:bg-black/40 backdrop-blur-md p-3 md:p-4 rounded-md transition-all duration-200 cursor-pointer border border-white/5 hover:border-white/10 shadow-lg hover:shadow-xl hover:scale-[1.02] flex-shrink-0 w-[140px] md:w-auto snap-start"
+            className="group bg-white/5 hover:bg-white/10 backdrop-blur-md p-3 md:p-4 rounded-md transition-all duration-200 cursor-pointer border border-white/10 hover:border-white/20 shadow-lg hover:shadow-xl hover:scale-[1.02] flex-shrink-0 w-[140px] md:w-auto snap-start"
             onClick={onClick}
         >
             <div className={`relative mb-3 aspect-square ${isRound ? 'rounded-full' : 'rounded'} overflow-hidden`}>
@@ -87,9 +87,9 @@ function MediaCard({
                         }}
                     >
                         {isActive && isPlaying ? (
-                            <Pause size={16} className="md:w-[18px] md:h-[18px]" fill="black" />
+                            <Pause size={16} className="md:w-[18px] md:h-[18px] text-white" fill="white" />
                         ) : (
-                            <Play size={16} className="md:w-[18px] md:h-[18px] ml-0.5" fill="black" />
+                            <Play size={16} className="md:w-[18px] md:h-[18px] ml-0.5 text-white" fill="white" />
                         )}
                     </button>
                 )}
@@ -125,7 +125,7 @@ function QuickPlayCard({
 }) {
     return (
         <div
-            className="group flex items-center bg-black/30 hover:bg-black/40 backdrop-blur-md rounded-md overflow-hidden transition-all duration-200 cursor-pointer h-[56px] md:h-[64px] border border-white/5 hover:border-white/10 shadow-lg hover:shadow-xl hover:scale-[1.02]"
+            className="group flex items-center bg-white/5 hover:bg-white/10 backdrop-blur-md rounded-md overflow-hidden transition-all duration-200 cursor-pointer h-[56px] md:h-[64px] border border-white/10 hover:border-white/20 shadow-lg hover:shadow-xl hover:scale-[1.02]"
             onClick={onClick}
         >
             <div className="w-14 h-14 md:w-16 md:h-16 flex-shrink-0 shadow-card">
@@ -142,7 +142,7 @@ function QuickPlayCard({
                 className={`w-9 h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center transition-all duration-200 mr-1.5 md:mr-2 shadow-lg flex-shrink-0
                     ${isActive 
                         ? 'bg-primary opacity-100' 
-                        : 'bg-white opacity-0 group-hover:opacity-100'
+                        : 'bg-white/60 hover:bg-primary opacity-0 group-hover:opacity-100'
                     }`}
                 onClick={(e) => {
                     e.stopPropagation();
@@ -150,9 +150,9 @@ function QuickPlayCard({
                 }}
             >
                 {isActive && isPlaying ? (
-                    <Pause size={16} className="md:w-[18px] md:h-[18px]" fill="black" />
+                    <Pause size={16} className="md:w-[18px] md:h-[18px] text-white" fill="white" />
                 ) : (
-                    <Play size={16} className="md:w-[18px] md:h-[18px] ml-0.5" fill="black" />
+                    <Play size={16} className="md:w-[18px] md:h-[18px] ml-0.5 text-white" fill="white" />
                 )}
             </button>
         </div>
@@ -895,7 +895,7 @@ export function Home({ activePlaylistId, activeAlbumId, activeArtistId, onTrackS
                         </div>
                     </div>
 
-                    <div className="px-6 py-3 flex items-center gap-5 bg-black/30 backdrop-blur-xl border-b border-white/5">
+                    <div className="px-6 py-3 flex items-center gap-5 bg-white/5 backdrop-blur-xl border-b border-white/10">
                         <button
                             className={`w-14 h-14 rounded-full flex items-center justify-center transition-all hover:scale-[1.05] 
                                 ${isPlaying && currentTrack && allTracks.some(t => t.id === currentTrack.id)
@@ -978,7 +978,7 @@ export function Home({ activePlaylistId, activeAlbumId, activeArtistId, onTrackS
                     <div className="px-6 pb-6">
                         {filteredTracks.length > 0 ? (
                             <>
-                                <div className="grid grid-cols-[16px_1fr_auto] md:grid-cols-[16px_4fr_3fr_minmax(80px,1fr)] gap-3 px-3 py-2 text-xs font-medium text-text-muted uppercase tracking-wider border-b border-white/10 sticky top-0 bg-black/40 backdrop-blur-2xl z-10 rounded-t-lg">
+                                <div className="grid grid-cols-[16px_1fr_auto] md:grid-cols-[16px_4fr_3fr_minmax(80px,1fr)] gap-3 px-3 py-2 text-xs font-bold text-white uppercase tracking-wider border-b border-white/20 sticky top-0 bg-transparent z-10 rounded-t-lg drop-shadow-md">
                                     <div className="text-center">#</div>
                                     <div>Title</div>
                                     <div className="hidden md:block">Album</div>
@@ -991,7 +991,7 @@ export function Home({ activePlaylistId, activeAlbumId, activeArtistId, onTrackS
                                     {displayedTracks.map((track, index) => (
                                         <div
                                             key={`${track.id}-${index}`}
-                                            className={`grid grid-cols-[16px_1fr_auto] md:grid-cols-[16px_4fr_3fr_minmax(80px,1fr)] gap-3 px-3 py-2 group bg-black/30 hover:bg-black/40 backdrop-blur-md rounded-md cursor-pointer transition-all border border-white/5 hover:border-white/15 ${currentTrack?.id === track.id ? 'bg-black/60 border-white/30' : ''
+                                            className={`grid grid-cols-[16px_1fr_auto] md:grid-cols-[16px_4fr_3fr_minmax(80px,1fr)] gap-3 px-3 py-2 group bg-white/5 hover:bg-white/10 backdrop-blur-md rounded-md cursor-pointer transition-all border border-white/10 hover:border-white/20 ${currentTrack?.id === track.id ? 'bg-white/10 border-white/30' : ''
                                                 }`}
                                             onClick={() => handleTrackClick(track)}
                                             onMouseEnter={() => setHoveredTrack(track.id)}

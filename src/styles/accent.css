@@ -8,7 +8,7 @@ button.accent-button,
 
 button.accent-button:hover,
 .accent-button:hover {
-  background-color: var(--spice-button-active, #ffffff) !important;
+  background-color: var(--spice-button-active, #1ed760) !important;
 }
 
 /* Progress bars and sliders */
@@ -60,11 +60,6 @@ a:focus-visible {
 /* Glow effects */
 .accent-glow {
   box-shadow: 0 0 20px var(--accent-color, #ffffff) !important;
-}
-
-/* Link hover effects */
-a:hover {
-  color: var(--accent-color, #ffffff);
 }
 
 /* Progress bar animations */

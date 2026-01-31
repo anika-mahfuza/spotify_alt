@@ -229,8 +229,8 @@ export const SearchBar = ({ onSearch, isLoading, value, onChange, showHomeButton
           {showUserMenu && (
             <div className="
               absolute top-full right-0 mt-2 w-52
-              bg-black/60 backdrop-blur-2xl rounded-xl overflow-hidden
-              shadow-elevated border border-white/10
+              bg-white/10 backdrop-blur-2xl rounded-xl overflow-hidden
+              shadow-elevated border border-white/20
               animate-scaleIn z-50
             ">
               <div className="px-4 py-2.5 border-b border-white/10">

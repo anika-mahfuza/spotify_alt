@@ -10,12 +10,11 @@ interface NowPlayingSidebarProps {
     currentIndex?: number;
     onSelectQueueIndex?: (index: number) => void;
     onRemoveFromQueue?: (index: number) => void;
-    textColor?: string;
     width: number;
     setWidth: (width: number) => void;
 }
 
-export function NowPlayingSidebar({ currentTrack, artistDetails, onClose, queue = [], currentIndex = 0, onSelectQueueIndex, onRemoveFromQueue, textColor = '#FFFFFF', width, setWidth }: NowPlayingSidebarProps) {
+export function NowPlayingSidebar({ currentTrack, artistDetails, onClose, queue = [], currentIndex = 0, onSelectQueueIndex, onRemoveFromQueue, width, setWidth }: NowPlayingSidebarProps) {
     const [showAllQueue, setShowAllQueue] = useState(false);
     // Removed local width state in favor of prop
     const [isResizing, setIsResizing] = useState(false);
@@ -88,12 +87,11 @@ export function NowPlayingSidebar({ currentTrack, artistDetails, onClose, queue 
             
             <div
                 ref={sidebarRef}
-                className={`fixed lg:static top-0 right-0 z-[60] h-screen flex flex-col p-5 border-l border-white/5 shadow-elevated backdrop-blur-3xl bg-black/40 ${isResizing ? 'select-none' : ''} transition-transform duration-300 lg:transition-none ${!isDesktop ? 'translate-x-0' : ''}`}
+                className={`fixed lg:static top-0 right-0 z-[60] h-screen flex flex-col p-5 border-l border-white/10 shadow-elevated backdrop-blur-3xl bg-white/5 ${isResizing ? 'select-none' : ''} transition-transform duration-300 lg:transition-none ${!isDesktop ? 'translate-x-0' : ''}`}
                 style={{
                     width: isDesktop ? `${width}px` : '90%',
                     maxWidth: isDesktop ? undefined : '480px',
                     paddingBottom: !isDesktop ? 'calc(1.25rem + env(safe-area-inset-bottom))' : undefined,
-                    color: textColor,
                 }}
             >
             {/* Resize Handle - Desktop Only */}
@@ -121,7 +119,7 @@ export function NowPlayingSidebar({ currentTrack, artistDetails, onClose, queue 
                         {coverUrl ? (
                             <img src={coverUrl} alt={currentTrack.name} className="w-full rounded-lg shadow-card" />
                         ) : (
-                            <div className="w-full aspect-square rounded-lg bg-bg-secondary flex items-center justify-center">
+                            <div className="w-full aspect-square rounded-lg bg-black/20 flex items-center justify-center">
                                 <Music size={48} className="text-text-muted" />
                             </div>
                         )}
@@ -158,7 +156,7 @@ export function NowPlayingSidebar({ currentTrack, artistDetails, onClose, queue 
                                             href={`https://open.spotify.com/artist/${artistDetails.id}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="flex items-center gap-1.5 text-xs font-medium text-text-secondary hover:text-white bg-bg-tertiary hover:bg-bg-hover px-2.5 py-1.5 rounded-full transition-colors"
+                                            className="flex items-center gap-1.5 text-xs font-medium text-text-secondary hover:text-white bg-white/10 hover:bg-white/20 px-2.5 py-1.5 rounded-full transition-colors"
                                             title="Open artist in Spotify"
                                         >
                                             <ExternalLink size={12} />
@@ -191,7 +189,7 @@ export function NowPlayingSidebar({ currentTrack, artistDetails, onClose, queue 
                                         return (
                                             <div
                                                 key={`${track.id}-${absoluteIndex}`}
-                                                className="w-full flex items-center gap-2.5 rounded-md p-2 transition-colors hover:bg-bg-tertiary group"
+                                                className="w-full flex items-center gap-2.5 rounded-md p-2 transition-colors hover:bg-white/10 group"
                                             >
                                                 <button
                                                     type="button"
@@ -201,7 +199,7 @@ export function NowPlayingSidebar({ currentTrack, artistDetails, onClose, queue 
                                                     {track.image ? (
                                                         <img src={track.image} alt={track.name} className="w-10 h-10 rounded" />
                                                     ) : (
-                                                        <div className="w-10 h-10 rounded bg-bg-tertiary flex items-center justify-center">
+                                                        <div className="w-10 h-10 rounded bg-black/20 flex items-center justify-center">
                                                             <Music size={18} className="text-text-muted" />
                                                         </div>
                                                     )}

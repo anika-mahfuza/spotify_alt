@@ -110,12 +110,12 @@ function VideoItem({ video, onSelect, formatDuration, isActive = false, isPlayin
                                 flex items-center justify-center
                                 transform transition-all duration-200
                                 hover:scale-110
-                                ${isActive ? 'bg-primary' : 'bg-white hover:bg-white'}
+                    ${isActive ? 'bg-primary' : 'bg-white/60 hover:bg-primary'}
                             `}>
                                 {isActive && isPlaying ? (
-                                    <Pause size={24} fill="black" className="text-black" />
+                                    <Pause size={24} fill="white" className="text-white" />
                                 ) : (
-                                    <Play size={24} fill="black" className="text-black ml-1" />
+                                    <Play size={24} fill="white" className="text-white ml-1" />
                                 )}
                             </div>
                         </div>
@@ -176,7 +176,7 @@ function VideoItem({ video, onSelect, formatDuration, isActive = false, isPlayin
                     transition-all duration-200
                     shadow-button
                     ${isHovered || isActive ? 'scale-100 opacity-100' : 'scale-90 opacity-0'}
-                    ${isActive ? 'bg-primary' : 'bg-white hover:bg-white'}
+                    ${isActive ? 'bg-primary' : 'bg-white/80 hover:bg-white/90'}
                 `}
             >
                 {isActive && isPlaying ? (

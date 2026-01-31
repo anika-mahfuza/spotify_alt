@@ -10,7 +10,7 @@
     <script>
         async function play() {
             const q = document.getElementById("q").value;
-            const res = await fetch(`http://localhost:5000/search?q=${encodeURIComponent(q)}`);
+            const res = await fetch(`http://127.0.0.1:5000/search?q=${encodeURIComponent(q)}`);
             const data = await res.json();
 
             document.getElementById("title").innerText = data.title;
