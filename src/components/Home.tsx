@@ -75,10 +75,10 @@ function MediaCard({
 
                 {showPlayButton && (
                     <button
-                        className={`absolute right-1.5 bottom-1.5 md:right-2 md:bottom-2 w-9 h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center transition-all duration-200 shadow-lg
+                        className={`absolute right-1.5 bottom-1.5 md:right-2 md:bottom-2 w-9 h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center transition-all duration-200 shadow-lg play-btn-hover
                             ${isActive 
                                 ? 'bg-primary opacity-100 translate-y-0' 
-                                : 'bg-white opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0'
+                                : 'bg-white/60 opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0'
                             }`}
                         onClick={(e) => {
                             e.stopPropagation();
@@ -139,10 +139,10 @@ function QuickPlayCard({
             </div>
             <span className={`flex-1 font-medium text-xs sm:text-sm px-2 sm:px-3 truncate ${isActive ? 'text-primary' : 'text-white'}`}>{title}</span>
             <button
-                className={`w-9 h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center transition-all duration-200 mr-1.5 md:mr-2 shadow-lg flex-shrink-0
+                className={`w-9 h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center transition-all duration-200 mr-1.5 md:mr-2 shadow-lg flex-shrink-0 play-btn-hover
                     ${isActive 
                         ? 'bg-primary opacity-100' 
-                        : 'bg-white/60 hover:bg-primary opacity-0 group-hover:opacity-100'
+                        : 'bg-white/60 opacity-0 group-hover:opacity-100'
                     }`}
                 onClick={(e) => {
                     e.stopPropagation();
@@ -625,7 +625,14 @@ export function Home({ activePlaylistId, activeAlbumId, activeArtistId, onTrackS
     }, [activePlaylistId, activeAlbumId, activeArtistId]);
 
     return (
-        <div className="flex-1 overflow-y-auto pb-[calc(6rem+env(safe-area-inset-bottom))]">
+        <>
+            <style>{`
+                .play-btn-hover:hover {
+                    background-color: var(--accent-color-hover, var(--accent-color, #1ed760)) !important;
+                    background: var(--accent-color-hover, var(--accent-color, #1ed760)) !important;
+                }
+            `}</style>
+            <div className="flex-1 overflow-y-auto pb-[calc(6rem+env(safe-area-inset-bottom))]">
             {!activePlaylistId && !activeAlbumId && !activeArtistId && !loading && (
                 <div className="min-h-full">
                     <div className="px-6 pt-6 pb-5">
@@ -1089,5 +1096,6 @@ export function Home({ activePlaylistId, activeAlbumId, activeArtistId, onTrackS
                 </div>
             )}
         </div>
+        </>
     );
 }

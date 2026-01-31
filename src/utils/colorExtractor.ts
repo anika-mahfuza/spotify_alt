@@ -60,6 +60,25 @@ export const normalizeAccentColor = (hex: string, minLuminance = 0.45): string =
   return rgbToHex(nr, ng, nb);
 };
 
+const normalizeHoverAccentColor = (hex: string, maxLuminance = 0.85): string => {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!result) return hex;
+
+  const r = parseInt(result[1], 16);
+  const g = parseInt(result[2], 16);
+  const b = parseInt(result[3], 16);
+  const luminance = getLuminance(r, g, b);
+
+  if (luminance <= maxLuminance) return hex;
+
+  const blend = clamp(1 - maxLuminance / luminance, 0, 0.6);
+  const nr = Math.round(r * (1 - blend));
+  const ng = Math.round(g * (1 - blend));
+  const nb = Math.round(b * (1 - blend));
+
+  return rgbToHex(nr, ng, nb);
+};
+
 /**
  * Find the most prominent color from a list of RGB values (inspired by Hazy theme)
  * Now prioritizes saturation over raw frequency
@@ -176,6 +195,7 @@ export const setAccentColor = (color: string) => {
     root.style.setProperty("--spice-accent", color);
     root.style.setProperty("--accent-color", color);
     root.style.setProperty("--primary-color", color);
+    root.style.setProperty("--accent-color-hover", normalizeHoverAccentColor(color));
 
     // Set RGB variable for alpha transparency
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(color);
