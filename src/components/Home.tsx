@@ -100,7 +100,7 @@ function MediaCard({
             </h3>
             {subtitle && (
                 <p
-                    className="text-xs text-text-muted line-clamp-2 leading-normal"
+                    className="text-xs text-white/60 line-clamp-2 leading-normal"
                     dangerouslySetInnerHTML={{ __html: subtitle }}
                 />
             )}

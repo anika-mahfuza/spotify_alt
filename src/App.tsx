@@ -413,7 +413,18 @@ function MainContent({
 function MainLayout() {
   const [isNowPlayingSidebarOpen, setIsNowPlayingSidebarOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState(320); // Default width
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    // Load saved width from localStorage, default to 320
+    const savedWidth = localStorage.getItem('now_playing_sidebar_width');
+    if (savedWidth) {
+      const parsed = parseInt(savedWidth, 10);
+      // Ensure width is within valid range
+      if (parsed >= 280 && parsed <= 600) {
+        return parsed;
+      }
+    }
+    return 320; // Default width
+  });
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [artistDetails, setArtistDetails] = useState<Artist | null>(null);
   const [queue, setQueue] = useState<Track[]>([]);
@@ -443,6 +454,11 @@ function MainLayout() {
     };
     extractColors();
   }, [currentTrack]);
+
+  // Save sidebar width to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('now_playing_sidebar_width', sidebarWidth.toString());
+  }, [sidebarWidth]);
 
   const handleSelectQueueIndex = (index: number) => {
     if (index < 0 || index >= queue.length) return;

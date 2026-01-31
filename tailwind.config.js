@@ -27,8 +27,8 @@ export default {
         text: {
           primary: '#FFFFFF',
           secondary: '#B3B3B3',
-          muted: '#6A6A6A',
-          disabled: '#535353',
+          muted: '#9A9A9A',
+          disabled: '#6A6A6A',
         },
         border: {
           DEFAULT: 'rgba(255, 255, 255, 0.08)',
