@@ -425,10 +425,20 @@ function MainLayout() {
     }
     return 320; // Default width
   });
-  const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
+  // Restore last played track from localStorage on app start
+  const [currentTrack, setCurrentTrack] = useState<Track | null>(() => {
+    const saved = localStorage.getItem('player_current_track');
+    return saved ? JSON.parse(saved) : null;
+  });
   const [artistDetails, setArtistDetails] = useState<Artist | null>(null);
-  const [queue, setQueue] = useState<Track[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [queue, setQueue] = useState<Track[]>(() => {
+    const saved = localStorage.getItem('player_queue');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [currentIndex, setCurrentIndex] = useState(() => {
+    const saved = localStorage.getItem('player_current_index');
+    return saved ? parseInt(saved) : 0;
+  });
   // Extract colors from current track (Hazy-style)
   useEffect(() => {
     const extractColors = async () => {
