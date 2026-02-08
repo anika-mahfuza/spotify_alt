@@ -23,8 +23,8 @@ export default {
     // --- BACKEND PROXY (via sslip.io to bypass Cloudflare IP restriction) ---
     // Cloudflare Workers block direct IP access (Error 1003).
     // We use sslip.io, a free DNS service that maps ANY-IP.sslip.io to that IP.
-    const BACKEND_HOST = "217.154.114.227.sslip.io"; 
-    const BACKEND_PORT = "11700";
+    const BACKEND_HOST = "212.227.64.179.sslip.io"; 
+    const BACKEND_PORT = "11946";
     
     // We construct the URL with sslip.io domain
     const targetUrl = `http://${BACKEND_HOST}:${BACKEND_PORT}${url.pathname}${url.search}`;
@@ -37,7 +37,7 @@ export default {
         // CRITICAL: We set the Host header to the actual IP:PORT.
         // Some backends might not recognize the sslip.io domain.
         // This ensures the backend sees "Host: 217.154.114.227:11700"
-        "Host": `217.154.114.227:${BACKEND_PORT}`,
+        "Host": `212.227.64.179:${BACKEND_PORT}`,
         ...(request.headers.get("Content-Type") && { "Content-Type": request.headers.get("Content-Type") })
       },
       body: request.body,

@@ -36,6 +36,9 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 load_dotenv()
 
+# Get the directory where this script is located
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
 
 # --- Simple Memory Cache ---
 class MemoryCache:
@@ -110,7 +113,7 @@ YTDL_OPTS = {
     "socket_timeout": 30,
     "retries": 10,
     "fragment_retries": 10,
-    "cookiefile": "cookies.txt",
+    "cookiefile": os.path.join(SCRIPT_DIR, "cookies.txt"),
     "verbose": True,
     "extractor_args": {
         "youtube": {
