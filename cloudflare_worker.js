@@ -29,17 +29,18 @@ export default {
     // We construct the URL with sslip.io domain
     const targetUrl = `http://${BACKEND_HOST}:${BACKEND_PORT}${url.pathname}${url.search}`;
 
+    // Clone original headers to preserve audio streaming headers (Accept, Range, etc.)
+    const proxyHeaders = new Headers(request.headers);
+    
+    // Override/set only necessary proxy headers
+    proxyHeaders.set("User-Agent", "Cloudflare-Worker-Proxy");
+    proxyHeaders.set("Host", `212.227.64.179:${BACKEND_PORT}`);
+    // Remove any existing Origin to avoid CORS issues
+    proxyHeaders.delete("Origin");
+    
     const proxyRequest = new Request(targetUrl, {
       method: request.method,
-      headers: {
-        "Accept": "*/*", 
-        "User-Agent": "Cloudflare-Worker-Proxy",
-        // CRITICAL: We set the Host header to the actual IP:PORT.
-        // Some backends might not recognize the sslip.io domain.
-        // This ensures the backend sees "Host: 217.154.114.227:11700"
-        "Host": `212.227.64.179:${BACKEND_PORT}`,
-        ...(request.headers.get("Content-Type") && { "Content-Type": request.headers.get("Content-Type") })
-      },
+      headers: proxyHeaders,
       body: request.body,
       redirect: "manual" 
     });
