@@ -94,7 +94,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         const refresh = async () => {
             try {
-                const apiUrl = import.meta.env?.VITE_API_URL || 'http://127.0.0.1:11700';
+                const apiUrl = import.meta.env?.VITE_API_URL || 'http://127.0.0.1:11946';
                 const response = await fetch(`${apiUrl}/refresh-token?refresh_token=${refreshToken}`);
                 
                 if (!response.ok) {

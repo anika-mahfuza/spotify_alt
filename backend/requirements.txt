@@ -1,8 +1,0 @@
-yt-dlp
-fastapi
-uvicorn
-python-multipart
-spotipy
-python-dotenv
-requests
-httpx
