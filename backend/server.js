@@ -669,3 +669,5 @@ app.get('*', (req, res) => {
 app.listen(PORT, () => {
   console.log(`\n  Spotify ALT Backend running → http://localhost:${PORT}\n`);
 });
+
+module.exports = app;
