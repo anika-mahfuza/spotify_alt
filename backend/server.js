@@ -661,13 +661,9 @@ app.get('/search-and-play', async (req, res) => {
   }
 });
 
-// ─── Catch-all for SPA (test.html) ───────────────────────────────────────────
+// ─── Catch-all for 404 ──────────────────────────────────────────────────────
 app.get('*', (req, res) => {
-  // Don't serve test.html for API routes that weren't matched
-  if (req.path.startsWith('/api/')) {
-    return res.status(404).json({ error: 'Not found' });
-  }
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.status(404).json({ error: 'Not found' });
 });
 
 app.listen(PORT, () => {
