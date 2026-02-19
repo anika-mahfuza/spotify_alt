@@ -34,6 +34,11 @@ app.use(cors({
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// ─── Health Check ─────────────────────────────────────────────────────────────
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // ─── YouTube Search (youtube-sr) ──────────────────────────────────────────────
 let YouTube = null;
 async function getYT() {
