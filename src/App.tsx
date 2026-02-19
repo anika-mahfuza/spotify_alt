@@ -46,7 +46,7 @@ function Login() {
       {/* Main Content - Centered */}
       <main className="flex-1 flex flex-col items-center justify-center text-center px-6 relative z-10 min-h-screen pt-20 pb-20">
         {/* Headline */}
-        <h1 
+        <h1
           className="text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight mb-6 max-w-5xl leading-[1.1] opacity-0 animate-slide-up"
           style={{ animationDelay: '0.5s', animationFillMode: 'forwards' }}
         >
@@ -57,7 +57,7 @@ function Login() {
         </h1>
 
         {/* Subheadline */}
-        <p 
+        <p
           className="text-lg md:text-xl text-white/50 mb-12 max-w-xl font-normal leading-relaxed opacity-0 animate-slide-up"
           style={{ animationDelay: '0.6s', animationFillMode: 'forwards' }}
         >
@@ -74,13 +74,13 @@ function Login() {
         >
           {/* Glow effect */}
           <div className="absolute -inset-1 bg-gradient-to-r from-blue-600/20 via-purple-600/20 to-blue-600/20 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-          
+
           <div className="relative flex items-center gap-3 bg-white text-black font-semibold py-4 px-10 rounded-full text-base transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] hover:shadow-[0_0_40px_rgba(255,255,255,0.3)]">
             <span>Continue with Spotify</span>
-            <svg 
-              className="w-5 h-5 transition-transform duration-300 group-hover:translate-x-1" 
-              fill="none" 
-              viewBox="0 0 24 24" 
+            <svg
+              className="w-5 h-5 transition-transform duration-300 group-hover:translate-x-1"
+              fill="none"
+              viewBox="0 0 24 24"
               stroke="currentColor"
             >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
@@ -89,7 +89,7 @@ function Login() {
         </button>
 
         {/* Optional: Subtle feature hints */}
-        <div 
+        <div
           className="flex flex-wrap items-center justify-center gap-4 mt-16 opacity-0 animate-fade-in"
           style={{ animationDelay: '0.9s', animationFillMode: 'forwards' }}
         >
@@ -207,6 +207,8 @@ function MainContent({
 
 
   useEffect(() => {
+    let isActive = true;
+
     if (currentTrack && currentTrack.artist) {
       const fetchArtistDetails = async () => {
         try {
@@ -214,6 +216,9 @@ function MainContent({
           // Use fetchWithAuth instead of direct fetch
           const response = await fetchWithAuth(`${config.API_URL}/artist-details?artistName=${encodeURIComponent(artistName)}`);
           const data = await response.json();
+
+          if (!isActive) return;
+
           const isValidArtist =
             data &&
             typeof data === 'object' &&
@@ -221,6 +226,7 @@ function MainContent({
             (data as { name: string }).name.trim().length > 0;
           setArtistDetails(isValidArtist ? data : null);
         } catch (error) {
+          if (!isActive) return;
           console.error("Failed to fetch artist details", error);
           setArtistDetails(null);
         }
@@ -229,7 +235,11 @@ function MainContent({
     } else {
       setArtistDetails(null);
     }
-  }, [currentTrack, token, setArtistDetails, fetchWithAuth]);
+
+    return () => {
+      isActive = false;
+    };
+  }, [currentTrack?.artist, token, setArtistDetails, fetchWithAuth]);
 
   useEffect(() => {
     setSearchQuery('');
@@ -273,7 +283,7 @@ function MainContent({
     setShowSearchResults(true);
 
     try {
-      const response = await fetchWithAuth(`${config.API_URL}/search?q=${encodeURIComponent(query)}`);
+      const response = await fetch(`${config.API_URL}/search?q=${encodeURIComponent(query)}`);
       const data = await response.json();
       setSearchResults(Array.isArray(data) ? data : []);
     } catch (error) {
@@ -299,9 +309,22 @@ function MainContent({
       thumbnail: video.thumbnail,
       isYoutube: true
     };
+
+    // Build queue from all search results so prev/next works
+    const fullQueue: Track[] = searchResults.map(v => ({
+      id: v.id,
+      name: v.title,
+      artist: v.uploader || 'Unknown',
+      album: 'YouTube Video',
+      duration_ms: (v.duration || 0) * 1000,
+      thumbnail: v.thumbnail,
+      isYoutube: true
+    }));
+
+    const index = fullQueue.findIndex(t => t.id === track.id);
     setCurrentTrack(track);
-    setQueue([track]);
-    setCurrentIndex(0);
+    setQueue(fullQueue);
+    setCurrentIndex(index >= 0 ? index : 0);
   };
 
   const clearSearch = () => {
@@ -331,8 +354,8 @@ function MainContent({
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 overflow-y-auto scrollbar-thin pb-[calc(72px+env(safe-area-inset-bottom))] md:pb-32">
-        {showSearchResults ? (
+      <div className="flex-1 overflow-y-auto scrollbar-thin pb-[calc(160px+env(safe-area-inset-bottom))] md:pb-32">
+        <div className={showSearchResults ? "block" : "hidden"}>
           <div className="px-8 py-6 animate-fadeIn">
             <div className="flex items-center justify-between mb-8">
               <div>
@@ -363,9 +386,9 @@ function MainContent({
                 <p className="text-text-muted text-lg">Searching...</p>
               </div>
             ) : searchResults.length > 0 ? (
-              <ResultList 
-                results={searchResults} 
-                onSelect={handleSearchResultSelect} 
+              <ResultList
+                results={searchResults}
+                onSelect={handleSearchResultSelect}
                 currentTrack={currentTrack}
                 isPlaying={isPlaying}
               />
@@ -379,7 +402,9 @@ function MainContent({
               </div>
             )}
           </div>
-        ) : (
+        </div>
+
+        <div className={showSearchResults ? "hidden" : "block"}>
           <Home
             activePlaylistId={activePlaylistId}
             activeAlbumId={activeAlbumId}
@@ -390,7 +415,7 @@ function MainContent({
             setIsPlaying={setIsPlaying}
             playingContextId={playingContextId}
           />
-        )}
+        </div>
       </div>
 
       {/* Player */}
@@ -478,7 +503,7 @@ function MainLayout() {
 
   const handleRemoveFromQueue = (index: number) => {
     if (index < 0 || index >= queue.length) return;
-    
+
     const newQueue = [...queue];
     newQueue.splice(index, 1);
     setQueue(newQueue);
@@ -486,18 +511,18 @@ function MainLayout() {
     if (index < currentIndex) {
       setCurrentIndex(currentIndex - 1);
     } else if (index === currentIndex) {
-        if (newQueue.length === 0) {
-            setCurrentTrack(null);
-            setCurrentIndex(0);
+      if (newQueue.length === 0) {
+        setCurrentTrack(null);
+        setCurrentIndex(0);
+      } else {
+        if (index >= newQueue.length) {
+          const newIndex = newQueue.length - 1;
+          setCurrentIndex(newIndex);
+          setCurrentTrack(newQueue[newIndex]);
         } else {
-            if (index >= newQueue.length) {
-                const newIndex = newQueue.length - 1;
-                setCurrentIndex(newIndex);
-                setCurrentTrack(newQueue[newIndex]);
-            } else {
-                setCurrentTrack(newQueue[index]);
-            }
+          setCurrentTrack(newQueue[index]);
         }
+      }
     }
   };
 
@@ -506,9 +531,9 @@ function MainLayout() {
       {/* Global dynamic background */}
       <DynamicBackground currentTrack={currentTrack} />
 
-      <Sidebar 
-        isOpen={isMobileMenuOpen} 
-        onClose={() => setIsMobileMenuOpen(false)} 
+      <Sidebar
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
       />
       <MainContent
         currentTrack={currentTrack}

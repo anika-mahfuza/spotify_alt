@@ -39,10 +39,10 @@ export const ResultList = ({ results, onSelect, currentTrack, isPlaying = false 
     return (
         <div className="space-y-2 animate-fadeIn">
             {results.map((video) => (
-                <VideoItem 
-                    key={video.id} 
-                    video={video} 
-                    onSelect={onSelect} 
+                <VideoItem
+                    key={video.id}
+                    video={video}
+                    onSelect={onSelect}
                     formatDuration={formatDuration}
                     isActive={currentTrack?.id === video.id}
                     isPlaying={isPlaying}
@@ -52,9 +52,9 @@ export const ResultList = ({ results, onSelect, currentTrack, isPlaying = false 
     );
 };
 
-function VideoItem({ video, onSelect, formatDuration, isActive = false, isPlaying = false }: { 
-    video: Video; 
-    onSelect: (video: Video) => void; 
+function VideoItem({ video, onSelect, formatDuration, isActive = false, isPlaying = false }: {
+    video: Video;
+    onSelect: (video: Video) => void;
     formatDuration: (seconds: number) => string;
     isActive?: boolean;
     isPlaying?: boolean;
@@ -62,7 +62,7 @@ function VideoItem({ video, onSelect, formatDuration, isActive = false, isPlayin
     const [imageError, setImageError] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
     const thumbnailUrl = video.thumbnail || '';
-    
+
     const getThumbnailUrl = (url: string) => {
         if (!url) return '';
         if (url.includes('youtube.com/vi/')) {
@@ -70,7 +70,7 @@ function VideoItem({ video, onSelect, formatDuration, isActive = false, isPlayin
         }
         return url;
     };
-    
+
     return (
         <div
             onClick={() => onSelect(video)}
@@ -81,8 +81,8 @@ function VideoItem({ video, onSelect, formatDuration, isActive = false, isPlayin
                 backdrop-blur-md
                 cursor-pointer transition-all duration-200
                 group border shadow-lg hover:shadow-xl
-                ${isActive 
-                    ? 'bg-black/20 border-white/20' 
+                ${isActive
+                    ? 'bg-black/20 border-white/20'
                     : 'bg-white/5 hover:bg-white/10 border-white/5 hover:border-white/10'}
             `}
         >
@@ -90,27 +90,27 @@ function VideoItem({ video, onSelect, formatDuration, isActive = false, isPlayin
             <div className="relative flex-shrink-0 w-28 h-28 sm:w-32 sm:h-32 rounded-lg overflow-hidden bg-white/5 backdrop-blur-sm shadow-card border border-white/10">
                 {!imageError && thumbnailUrl ? (
                     <>
-                        <img 
-                            src={getThumbnailUrl(thumbnailUrl)} 
+                        <img
+                            src={getThumbnailUrl(thumbnailUrl)}
                             alt={video.title}
                             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                             loading="lazy"
                             onError={() => setImageError(true)}
                         />
-                        
+
                         {/* Play button overlay */}
                         <div className={`
                             absolute inset-0 bg-black/60
                             flex items-center justify-center
                             transition-opacity duration-200
-                            ${isHovered || isActive ? 'opacity-100' : 'opacity-0'}
+                            ${(isHovered && window.matchMedia('(hover: hover)').matches) || isActive ? 'opacity-100' : 'opacity-0'}
                         `}>
                             <div className={`
                                 w-14 h-14 rounded-full
                                 flex items-center justify-center
                                 transform transition-all duration-200
-                                hover:scale-110
-                    ${isActive ? 'bg-primary' : 'bg-white/60 hover:bg-primary'}
+                                ${window.matchMedia('(hover: hover)').matches ? 'hover:scale-110' : 'active:scale-95'}
+                    ${isActive ? 'bg-primary' : 'bg-white/60'}
                             `}>
                                 {isActive && isPlaying ? (
                                     <Pause size={24} fill="white" className="text-white" />
@@ -143,15 +143,15 @@ function VideoItem({ video, onSelect, formatDuration, isActive = false, isPlayin
 
             {/* Video Info */}
             <div className="flex-1 min-w-0 pr-4">
-                <h3 
+                <h3
                     className={`
                         font-semibold text-base sm:text-lg mb-2
                         line-clamp-2 leading-snug transition-colors
                         ${isActive ? 'text-primary' : 'text-white group-hover:text-primary'}
                     `}
-                    dangerouslySetInnerHTML={{ __html: video.title }} 
+                    dangerouslySetInnerHTML={{ __html: video.title }}
                 />
-                
+
                 {video.uploader && (
                     <div className="flex items-center gap-2">
                         <div className="w-6 h-6 rounded-full bg-white/5 backdrop-blur-sm flex items-center justify-center border border-white/10">
@@ -164,27 +164,6 @@ function VideoItem({ video, onSelect, formatDuration, isActive = false, isPlayin
                 )}
             </div>
 
-            {/* Play Button - Desktop */}
-            <button
-                onClick={(e) => {
-                    e.stopPropagation();
-                    onSelect(video);
-                }}
-                className={`
-                    hidden sm:flex items-center justify-center
-                    w-12 h-12 rounded-full
-                    transition-all duration-200
-                    shadow-button
-                    ${isHovered || isActive ? 'scale-100 opacity-100' : 'scale-90 opacity-0'}
-                    ${isActive ? 'bg-primary' : 'bg-white/80 hover:bg-white/90'}
-                `}
-            >
-                {isActive && isPlaying ? (
-                    <Pause size={20} fill="black" className="text-black" />
-                ) : (
-                    <Play size={20} fill="black" className="text-black ml-0.5" />
-                )}
-            </button>
         </div>
     );
 }
