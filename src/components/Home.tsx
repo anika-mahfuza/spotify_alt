@@ -262,46 +262,63 @@ export function Home({ activePlaylistId, activeAlbumId, activeArtistId, onTrackS
                         return res.json();
                     };
 
-                    // Fetch ALL dashboard data in parallel - NO COUNTRY for featured playlists (avoids 404)
+                    // Helper to delay between batches
+                    const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+                    // BATCH 1: Critical data that should appear first
                     const [
                         recentRes,
-                        featuredRes,
-                        releasesRes,
-                        madeForYouRes,
                         topTracksRes,
-                        topArtistsRes,
-                        recommendationsRes,
-                        savedAlbumsRes,
                         userPlaylistsRes,
-                        browseCategoriesRes,
-                        likedSongsRes,
-                        followedArtistsRes
+                        madeForYouRes
                     ] = await Promise.allSettled([
                         // Recently Played - Direct Spotify API
                         fetchJson('https://api.spotify.com/v1/me/player/recently-played?limit=20'),
-                        // Featured Playlists (Deprecated by Spotify, returning empty to avoid 404)
-                        Promise.resolve({ playlists: { items: [] } }),
+                        // Top Tracks (via backend - cached)
+                        fetchJson(`${config.API_URL}/top-tracks`),
+                        // User Playlists (via backend - cached)
+                        fetchJson(`${config.API_URL}/playlists`),
+                        // Made For You (via backend - cached)
+                        fetchJson(`${config.API_URL}/made-for-you`)
+                    ]);
+
+                    await delay(300);
+
+                    // BATCH 2: Secondary data
+                    const [
+                        topArtistsRes,
+                        recommendationsRes,
+                        releasesRes,
+                        likedSongsRes
+                    ] = await Promise.allSettled([
+                        // Top Artists (via backend - cached)
+                        fetchJson(`${config.API_URL}/top-artists`),
+                        // Recommendations (via backend - cached)
+                        fetchJson(`${config.API_URL}/recommendations`),
                         // New Releases
                         fetchJson('https://api.spotify.com/v1/browse/new-releases?limit=20'),
-                        // Made For You (via backend)
-                        fetchJson(`${config.API_URL}/made-for-you`),
-                        // Top Tracks (via backend)
-                        fetchJson(`${config.API_URL}/top-tracks`),
-                        // Top Artists (via backend)
-                        fetchJson(`${config.API_URL}/top-artists`),
-                        // Recommendations (via backend)
-                        fetchJson(`${config.API_URL}/recommendations`),
-                        // Saved Albums (via backend)
-                        fetchJson(`${config.API_URL}/saved-albums`),
-                        // User Playlists (via backend)
-                        fetchJson(`${config.API_URL}/playlists`),
-                        // Browse Categories (via backend)
-                        fetchJson(`${config.API_URL}/browse-categories`),
                         // Liked Songs (via backend, limited for dashboard speed)
-                        fetchJson(`${config.API_URL}/saved-tracks?limit=true`),
-                        // Followed Artists (via backend)
-                        fetchJson(`${config.API_URL}/followed-artists`)
+                        fetchJson(`${config.API_URL}/saved-tracks?limit=true`)
                     ]);
+
+                    await delay(300);
+
+                    // BATCH 3: Lower priority data
+                    const [
+                        savedAlbumsRes,
+                        followedArtistsRes,
+                        browseCategoriesRes
+                    ] = await Promise.allSettled([
+                        // Saved Albums (via backend - cached)
+                        fetchJson(`${config.API_URL}/saved-albums`),
+                        // Followed Artists (via backend - cached)
+                        fetchJson(`${config.API_URL}/followed-artists`),
+                        // Browse Categories (via backend - cached)
+                        fetchJson(`${config.API_URL}/browse-categories`)
+                    ]);
+
+                    // Featured Playlists (Deprecated by Spotify, returning empty)
+                    const featuredRes = { status: 'fulfilled' as const, value: { playlists: { items: [] } } };
 
                     // Process Recently Played - deduplicate
                     if (recentRes.status === 'fulfilled') {

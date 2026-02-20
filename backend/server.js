@@ -27,6 +27,30 @@ const PIPED_INSTANCES = [
   'https://pipedapi.in.projectsegfau.lt'
 ];
 
+// ─── Simple In-Memory Cache (5 min TTL) ───────────────────────────────────────
+const responseCache = new Map();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+function getCached(key) {
+  const entry = responseCache.get(key);
+  if (entry && Date.now() - entry.timestamp < CACHE_TTL) {
+    return entry.data;
+  }
+  responseCache.delete(key);
+  return null;
+}
+
+function setCache(key, data) {
+  responseCache.set(key, { data, timestamp: Date.now() });
+  // Evict old entries periodically (keep cache from growing unbounded)
+  if (responseCache.size > 200) {
+    const now = Date.now();
+    for (const [k, v] of responseCache) {
+      if (now - v.timestamp > CACHE_TTL) responseCache.delete(k);
+    }
+  }
+}
+
 app.use(cors({
   origin: true, // Allow all origins in dev
   credentials: true
@@ -67,6 +91,45 @@ function mapResults(results) {
     duration: fmt(v.duration),
     thumbnail: v.thumbnail?.url || `https://i.ytimg.com/vi/${v.id}/mqdefault.jpg`
   }));
+}
+
+// ─── Smart Result Ranking ─────────────────────────────────────────────────────
+// Scores how well a YouTube result matches the intended song query
+function scoreResult(result, query) {
+  const q = query.toLowerCase().replace(/\s+audio$/i, '').trim();
+  const title = (result.title || '').toLowerCase();
+  const artist = (result.artist || '').toLowerCase();
+  let score = 0;
+
+  // Extract song name and artist from query (format: "song name artist name audio")
+  const qWords = q.split(/\s+/);
+
+  // Exact title containment is a strong signal
+  if (title.includes(q)) score += 100;
+
+  // Check each query word appears in title or artist
+  for (const word of qWords) {
+    if (word.length < 2) continue;
+    if (title.includes(word)) score += 10;
+    if (artist.includes(word)) score += 5;
+  }
+
+  // Penalize results that look like covers, remixes, live versions, reactions
+  const penalties = ['cover', 'remix', 'live', 'reaction', 'karaoke', 'instrumental', 'tutorial', 'lesson', 'slowed', 'reverb', 'sped up', '8d audio', 'bass boosted'];
+  for (const p of penalties) {
+    if (title.includes(p) && !q.includes(p)) score -= 25;
+  }
+
+  // Penalize very long videos (likely compilations/mixes) — over 10 min
+  const durMs = result.durationMs || 0;
+  if (durMs > 600000) score -= 15;
+  if (durMs > 1800000) score -= 30;
+
+  // Bonus for "official" in title
+  if (title.includes('official')) score += 8;
+  if (title.includes('audio') || title.includes('lyrics')) score += 5;
+
+  return score;
 }
 
 async function doSearch(q) {
@@ -304,8 +367,14 @@ app.get('/playlists', async (req, res) => {
   const token = getToken(req);
   if (!token) return res.status(401).json({ error: 'Token required' });
   try {
+    const cacheKey = `playlists_${token.slice(-10)}`;
+    const cached = getCached(cacheKey);
+    if (cached) return res.json(cached);
+
     const data = await spotifyFetch('/me/playlists', token, { limit: 50 });
-    res.json(data.items?.filter(p => p && p.id) || []);
+    const result = data.items?.filter(p => p && p.id) || [];
+    setCache(cacheKey, result);
+    res.json(result);
   } catch (e) {
     console.error('Playlists error:', e.message);
     res.status(500).json({ error: e.message });
@@ -395,8 +464,14 @@ app.get('/saved-albums', async (req, res) => {
   const token = getToken(req);
   if (!token) return res.status(401).json({ error: 'Token required' });
   try {
+    const cacheKey = `saved_albums_${token.slice(-10)}`;
+    const cached = getCached(cacheKey);
+    if (cached) return res.json(cached);
+
     const data = await spotifyFetch('/me/albums', token, { limit: 50 });
-    res.json(data.items?.map(i => i.album).filter(a => a && a.id) || []);
+    const result = data.items?.map(i => i.album).filter(a => a && a.id) || [];
+    setCache(cacheKey, result);
+    res.json(result);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -443,15 +518,21 @@ app.get('/top-tracks', async (req, res) => {
   const token = getToken(req);
   if (!token) return res.status(401).json({ error: 'Token required' });
   try {
+    const cacheKey = `top_tracks_${token.slice(-10)}`;
+    const cached = getCached(cacheKey);
+    if (cached) return res.json(cached);
+
     const data = await spotifyFetch('/me/top/tracks', token, { limit: 50, time_range: 'medium_term' });
-    res.json(data.items?.map(t => ({
+    const result = data.items?.map(t => ({
       id: t.id,
       name: t.name,
       artist: t.artists?.map(a => a.name).join(', ') || 'Unknown',
       album: t.album?.name || 'Unknown',
       duration_ms: t.duration_ms || 0,
       image: t.album?.images?.[0]?.url
-    })) || []);
+    })) || [];
+    setCache(cacheKey, result);
+    res.json(result);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -462,8 +543,14 @@ app.get('/top-artists', async (req, res) => {
   const token = getToken(req);
   if (!token) return res.status(401).json({ error: 'Token required' });
   try {
+    const cacheKey = `top_artists_${token.slice(-10)}`;
+    const cached = getCached(cacheKey);
+    if (cached) return res.json(cached);
+
     const data = await spotifyFetch('/me/top/artists', token, { limit: 50, time_range: 'medium_term' });
-    res.json(data.items?.filter(a => a && a.id) || []);
+    const result = data.items?.filter(a => a && a.id) || [];
+    setCache(cacheKey, result);
+    res.json(result);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -474,9 +561,15 @@ app.get('/made-for-you', async (req, res) => {
   const token = getToken(req);
   if (!token) return res.status(401).json({ error: 'Token required' });
   try {
+    const cacheKey = `made_for_you_${token.slice(-10)}`;
+    const cached = getCached(cacheKey);
+    if (cached) return res.json(cached);
+
     // featured-playlists is deprecated on Spotify API; return user's playlists instead
     const data = await spotifyFetch('/me/playlists', token, { limit: 20 });
-    res.json(data.items?.filter(p => p && p.id) || []);
+    const result = data.items?.filter(p => p && p.id) || [];
+    setCache(cacheKey, result);
+    res.json(result);
   } catch (e) {
     res.json([]);
   }
@@ -487,16 +580,22 @@ app.get('/recommendations', async (req, res) => {
   const token = getToken(req);
   if (!token) return res.status(401).json({ error: 'Token required' });
   try {
+    const cacheKey = `recommendations_${token.slice(-10)}`;
+    const cached = getCached(cacheKey);
+    if (cached) return res.json(cached);
+
     // Recommendations deprecated, fallback to recent top tracks instead of 404ing
     const topData = await spotifyFetch('/me/top/tracks', token, { limit: 20, time_range: 'short_term' });
-    res.json(topData.items?.map(t => ({
+    const result = topData.items?.map(t => ({
       id: t.id,
       name: t.name,
       artist: t.artists?.map(a => a.name).join(', ') || 'Unknown',
       album: t.album?.name || 'Unknown',
       duration_ms: t.duration_ms || 0,
       image: t.album?.images?.[0]?.url
-    })) || []);
+    })) || [];
+    setCache(cacheKey, result);
+    res.json(result);
   } catch (e) {
     res.json([]);
   }
@@ -507,8 +606,14 @@ app.get('/followed-artists', async (req, res) => {
   const token = getToken(req);
   if (!token) return res.status(401).json({ error: 'Token required' });
   try {
+    const cacheKey = `followed_artists_${token.slice(-10)}`;
+    const cached = getCached(cacheKey);
+    if (cached) return res.json(cached);
+
     const data = await spotifyFetch('/me/following', token, { type: 'artist', limit: 50 });
-    res.json(data.artists?.items?.filter(a => a && a.id) || []);
+    const result = data.artists?.items?.filter(a => a && a.id) || [];
+    setCache(cacheKey, result);
+    res.json(result);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -554,6 +659,38 @@ app.get('/api/search', async (req, res) => {
     res.json(await doSearch(q));
   } catch (e) {
     console.error('Search error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ─── Best Match (smart scoring for Player) ────────────────────────────────────
+// Returns the single best-matching YouTube result for a song query
+app.get('/api/best-match', async (req, res) => {
+  const { q } = req.query;
+  if (!q) return res.status(400).json({ error: 'Query required' });
+  try {
+    // Check cache first (avoids re-searching for the same song)
+    const cacheKey = `best_match_${q.toLowerCase().trim()}`;
+    const cached = getCached(cacheKey);
+    if (cached) return res.json(cached);
+
+    const results = await doSearch(q);
+    if (!results.length) {
+      return res.status(404).json({ error: 'No results found' });
+    }
+
+    // Score each result and pick the best
+    const scored = results.map(r => ({ ...r, _score: scoreResult(r, q) }));
+    scored.sort((a, b) => b._score - a._score);
+
+    const best = scored[0];
+    console.log(`Best match for "${q}": "${best.title}" (score: ${best._score})`);
+
+    const result = { id: best.id, title: best.title, artist: best.artist, thumbnail: best.thumbnail };
+    setCache(cacheKey, result);
+    res.json(result);
+  } catch (e) {
+    console.error('Best-match error:', e.message);
     res.status(500).json({ error: e.message });
   }
 });

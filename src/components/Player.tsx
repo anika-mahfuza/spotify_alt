@@ -213,21 +213,38 @@ export function Player({ currentTrack, onNext, onPrev, backendUrl, isPlaying, se
                     ytId = currentTrack.id;
                 } else {
                     const query = `${currentTrack.name} ${currentTrack.artist} audio`;
-                    // Use the existing fast /api/search backend endpoint to get the ID
-                    const res = await fetch(`${backendUrl}/api/search?q=${encodeURIComponent(query)}`);
-                    if (!res.ok) throw new Error('Failed to search');
-                    const data = await res.json();
-                    if (data && data.length > 0) {
-                        ytId = data[0].id;
-                    } else {
-                        throw new Error('No results found');
+                    // Use smart best-match endpoint that scores results for accuracy
+                    let matched = false;
+                    try {
+                        const res = await fetch(`${backendUrl}/api/best-match?q=${encodeURIComponent(query)}`);
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (data && data.id) {
+                                ytId = data.id;
+                                matched = true;
+                            }
+                        }
+                    } catch {
+                        // best-match failed, fall through to regular search
+                    }
+
+                    // Fallback: use regular search if best-match failed
+                    if (!matched!) {
+                        const res = await fetch(`${backendUrl}/api/search?q=${encodeURIComponent(query)}`);
+                        if (!res.ok) throw new Error('Failed to search');
+                        const data = await res.json();
+                        if (data && data.length > 0) {
+                            ytId = data[0].id;
+                        } else {
+                            throw new Error('No results found');
+                        }
                     }
                 }
 
-                currentYoutubeIdRef.current = ytId;
+                currentYoutubeIdRef.current = ytId!;
 
                 if (ytReadyRef.current && ytPlayerRef.current) {
-                    playYoutubeId(ytId);
+                    playYoutubeId(ytId!);
                 }
             } catch (e: any) {
                 console.error("Failed to load track:", e);
