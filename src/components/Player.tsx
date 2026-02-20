@@ -54,6 +54,7 @@ export function Player({ currentTrack, onNext, onPrev, backendUrl, isPlaying, se
     const currentYoutubeIdRef = useRef<string | null>(null);
     const isInitialLoadRef = useRef(true);
     const progressTimerRef = useRef<number | null>(null);
+    const lastTrackObjRef = useRef<Track | null>(null);
 
     useEffect(() => {
         const handleResize = () => setIsLargeScreen(window.innerWidth >= 1024);
@@ -197,7 +198,26 @@ export function Player({ currentTrack, onNext, onPrev, backendUrl, isPlaying, se
         if (!currentTrack) return;
 
         const trackId = currentTrack.id || currentTrack.name;
-        if (trackId === currentTrackIdRef.current) return;
+        const isSameTrack = trackId === currentTrackIdRef.current;
+        const isSameObject = currentTrack === lastTrackObjRef.current;
+
+        // Skip if it's literally the same object reference (no change)
+        // But allow replay if it's a NEW object with the same ID (spread trick from repeat/shuffle)
+        if (isSameTrack && isSameObject) return;
+
+        lastTrackObjRef.current = currentTrack;
+
+        // If same track ID but different object — this is a replay request
+        if (isSameTrack) {
+            // Just replay the current YouTube video from the start
+            if (ytPlayerRef.current && currentYoutubeIdRef.current) {
+                ytPlayerRef.current.loadVideoById({ videoId: currentYoutubeIdRef.current, startSeconds: 0 });
+                setIsPlaying(true);
+                setProgress(0);
+                setCurrentTime(0);
+            }
+            return;
+        }
 
         stopProgressTimer(); // Prevent old track's progress from saving under new trackId
         currentTrackIdRef.current = trackId;

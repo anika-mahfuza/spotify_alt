@@ -258,53 +258,92 @@ function MainContent({
   const handleNext = (isShuffle?: boolean, repeatMode?: number) => {
     if (queue.length === 0) return;
 
-    let nextIndex = currentIndex + 1;
+    // Repeat-One (mode 2) is handled entirely in Player.tsx handleEnded
+    // When user manually clicks next during repeat-one, we advance normally
 
     if (isShuffle) {
-      // Pick a random track that isn't the current one (unless it's the only track)
-      if (queue.length > 1) {
-        do {
-          nextIndex = Math.floor(Math.random() * queue.length);
-        } while (nextIndex === currentIndex);
-      } else {
-        nextIndex = 0;
+      // Shuffle: pick a random track that isn't the current one
+      if (queue.length === 1) {
+        // Single track: force replay by creating a new track reference
+        setCurrentIndex(0);
+        setCurrentTrack({ ...queue[0] });
+        return;
       }
-    } else if (repeatMode === 1 && nextIndex >= queue.length) {
-      // Repeat All (Mode 1): Wrap around to the beginning
-      nextIndex = 0;
-    }
-
-    // Only update if the index is valid
-    if (nextIndex >= 0 && nextIndex < queue.length) {
+      let nextIndex: number;
+      do {
+        nextIndex = Math.floor(Math.random() * queue.length);
+      } while (nextIndex === currentIndex);
       setCurrentIndex(nextIndex);
       setCurrentTrack(queue[nextIndex]);
+      return;
     }
+
+    // Sequential (no shuffle)
+    const nextIndex = currentIndex + 1;
+
+    if (nextIndex >= queue.length) {
+      // We've reached the end of the queue
+      if (repeatMode === 1) {
+        // Repeat-All: wrap to beginning
+        if (queue.length === 1) {
+          // Single track: force replay with new reference
+          setCurrentIndex(0);
+          setCurrentTrack({ ...queue[0] });
+        } else {
+          setCurrentIndex(0);
+          setCurrentTrack(queue[0]);
+        }
+      }
+      // No repeat (mode 0): do nothing — playback stops naturally
+      return;
+    }
+
+    setCurrentIndex(nextIndex);
+    setCurrentTrack(queue[nextIndex]);
   };
 
   const handlePrev = (isShuffle?: boolean, repeatMode?: number) => {
     if (queue.length === 0) return;
 
-    let prevIndex = currentIndex - 1;
-
     if (isShuffle) {
-      // Pick a random track that isn't the current one
-      if (queue.length > 1) {
-        do {
-          prevIndex = Math.floor(Math.random() * queue.length);
-        } while (prevIndex === currentIndex);
-      } else {
-        prevIndex = 0;
+      // Shuffle: pick a random track that isn't the current one
+      if (queue.length === 1) {
+        // Single track: force replay
+        setCurrentIndex(0);
+        setCurrentTrack({ ...queue[0] });
+        return;
       }
-    } else if (repeatMode === 1 && prevIndex < 0) {
-      // Repeat All (Mode 1): Wrap around to the end
-      prevIndex = queue.length - 1;
-    }
-
-    // Only update if the index is valid
-    if (prevIndex >= 0 && prevIndex < queue.length) {
+      let prevIndex: number;
+      do {
+        prevIndex = Math.floor(Math.random() * queue.length);
+      } while (prevIndex === currentIndex);
       setCurrentIndex(prevIndex);
       setCurrentTrack(queue[prevIndex]);
+      return;
     }
+
+    // Sequential (no shuffle)
+    const prevIndex = currentIndex - 1;
+
+    if (prevIndex < 0) {
+      // We're at the start of the queue
+      if (repeatMode === 1) {
+        // Repeat-All: wrap to end
+        const lastIndex = queue.length - 1;
+        if (queue.length === 1) {
+          setCurrentIndex(0);
+          setCurrentTrack({ ...queue[0] });
+        } else {
+          setCurrentIndex(lastIndex);
+          setCurrentTrack(queue[lastIndex]);
+        }
+      }
+      // No repeat (mode 0): do nothing
+      return;
+    }
+
+    setCurrentIndex(prevIndex);
+    setCurrentTrack(queue[prevIndex]);
   };
 
   const handleSearch = async (query: string) => {
