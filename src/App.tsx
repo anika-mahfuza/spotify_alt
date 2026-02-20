@@ -255,17 +255,53 @@ function MainContent({
     setCurrentIndex(index >= 0 ? index : 0);
   };
 
-  const handleNext = () => {
-    if (queue.length > 0 && currentIndex < queue.length - 1) {
-      const nextIndex = currentIndex + 1;
+  const handleNext = (isShuffle?: boolean, repeatMode?: number) => {
+    if (queue.length === 0) return;
+
+    let nextIndex = currentIndex + 1;
+
+    if (isShuffle) {
+      // Pick a random track that isn't the current one (unless it's the only track)
+      if (queue.length > 1) {
+        do {
+          nextIndex = Math.floor(Math.random() * queue.length);
+        } while (nextIndex === currentIndex);
+      } else {
+        nextIndex = 0;
+      }
+    } else if (repeatMode === 1 && nextIndex >= queue.length) {
+      // Repeat All (Mode 1): Wrap around to the beginning
+      nextIndex = 0;
+    }
+
+    // Only update if the index is valid
+    if (nextIndex >= 0 && nextIndex < queue.length) {
       setCurrentIndex(nextIndex);
       setCurrentTrack(queue[nextIndex]);
     }
   };
 
-  const handlePrev = () => {
-    if (queue.length > 0 && currentIndex > 0) {
-      const prevIndex = currentIndex - 1;
+  const handlePrev = (isShuffle?: boolean, repeatMode?: number) => {
+    if (queue.length === 0) return;
+
+    let prevIndex = currentIndex - 1;
+
+    if (isShuffle) {
+      // Pick a random track that isn't the current one
+      if (queue.length > 1) {
+        do {
+          prevIndex = Math.floor(Math.random() * queue.length);
+        } while (prevIndex === currentIndex);
+      } else {
+        prevIndex = 0;
+      }
+    } else if (repeatMode === 1 && prevIndex < 0) {
+      // Repeat All (Mode 1): Wrap around to the end
+      prevIndex = queue.length - 1;
+    }
+
+    // Only update if the index is valid
+    if (prevIndex >= 0 && prevIndex < queue.length) {
       setCurrentIndex(prevIndex);
       setCurrentTrack(queue[prevIndex]);
     }
@@ -421,7 +457,7 @@ function MainContent({
       {/* Player */}
       <Player
         currentTrack={currentTrack}
-        nextTrack={queue.length > 0 && currentIndex < queue.length - 1 ? queue[currentIndex + 1] : null}
+        nextTrack={queue.length > 0 ? queue[(currentIndex + 1) % queue.length] : null}
         onNext={handleNext}
         onPrev={handlePrev}
         backendUrl={config.API_URL}

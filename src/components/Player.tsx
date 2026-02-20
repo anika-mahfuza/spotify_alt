@@ -12,8 +12,8 @@ declare global {
 interface PlayerProps {
     currentTrack: Track | null;
     nextTrack: Track | null;
-    onNext: () => void;
-    onPrev: () => void;
+    onNext: (isShuffle?: boolean, repeatMode?: number) => void;
+    onPrev: (isShuffle?: boolean, repeatMode?: number) => void;
     backendUrl: string;
     isPlaying: boolean;
     setIsPlaying: (playing: boolean) => void;
@@ -40,6 +40,12 @@ export function Player({ currentTrack, onNext, onPrev, backendUrl, isPlaying, se
         const saved = localStorage.getItem('player_repeat');
         return saved ? parseInt(saved) : 0;
     });
+
+    const stateRefs = useRef({ isShuffle, repeatMode, onNext });
+    useEffect(() => {
+        stateRefs.current = { isShuffle, repeatMode, onNext };
+    }, [isShuffle, repeatMode, onNext]);
+
     const [isLargeScreen, setIsLargeScreen] = useState(window.innerWidth >= 1024);
 
     const ytPlayerRef = useRef<any>(null);
@@ -115,7 +121,7 @@ export function Player({ currentTrack, onNext, onPrev, backendUrl, isPlaying, se
                     console.error("YT Player Error");
                     setError('Playback error');
                     setIsLoading(false);
-                    onNext(); // Auto skip on error like test.html
+                    stateRefs.current.onNext(stateRefs.current.isShuffle, stateRefs.current.repeatMode); // Auto skip on error like test.html
                 }
             }
         });
@@ -266,14 +272,19 @@ export function Player({ currentTrack, onNext, onPrev, backendUrl, isPlaying, se
     };
 
     const handleEnded = () => {
+        const { isShuffle, repeatMode, onNext } = stateRefs.current;
         if (repeatMode === 2) {
-            if (ytPlayerRef.current && ytPlayerRef.current.seekTo) {
-                ytPlayerRef.current.seekTo(0, true);
-                ytPlayerRef.current.playVideo();
+            if (ytPlayerRef.current) {
+                if (currentYoutubeIdRef.current) {
+                    ytPlayerRef.current.loadVideoById({ videoId: currentYoutubeIdRef.current, startSeconds: 0 });
+                } else {
+                    ytPlayerRef.current.seekTo(0, true);
+                    ytPlayerRef.current.playVideo();
+                }
                 setIsPlaying(true);
             }
         } else {
-            onNext();
+            onNext(isShuffle, repeatMode);
         }
     };
 
@@ -358,7 +369,7 @@ export function Player({ currentTrack, onNext, onPrev, backendUrl, isPlaying, se
                             <button onClick={toggleShuffle} className={`transition-all duration-150 ${isShuffle ? 'text-[#1DB954]' : 'text-white/70 hover:text-white'}`} disabled={isLoading} title="Shuffle">
                                 <Shuffle size={18} strokeWidth={2} />
                             </button>
-                            <button onClick={onPrev} className="transition-all hover:scale-105 text-white/70 hover:text-white" disabled={isLoading} title="Previous">
+                            <button onClick={() => onPrev(isShuffle, repeatMode)} className="transition-all hover:scale-105 text-white/70 hover:text-white" disabled={isLoading} title="Previous">
                                 <SkipBack size={22} className="md:w-5 md:h-5" fill="currentColor" strokeWidth={0} />
                             </button>
                             <button
@@ -375,7 +386,7 @@ export function Player({ currentTrack, onNext, onPrev, backendUrl, isPlaying, se
                                     <Play size={20} className="md:w-5 md:h-5 ml-0.5" fill="currentColor" strokeWidth={0} />
                                 )}
                             </button>
-                            <button onClick={onNext} className="transition-all hover:scale-105 text-white/70 hover:text-white" disabled={isLoading} title="Next">
+                            <button onClick={() => onNext(isShuffle, repeatMode)} className="transition-all hover:scale-105 text-white/70 hover:text-white" disabled={isLoading} title="Next">
                                 <SkipForward size={22} className="md:w-5 md:h-5" fill="currentColor" strokeWidth={0} />
                             </button>
                             <button onClick={toggleRepeat} className={`transition-all duration-150 relative hover:scale-105 ${repeatMode > 0 ? 'text-[#1DB954]' : 'text-white/70 hover:text-white'}`} disabled={isLoading} title={repeatMode === 0 ? "Repeat" : repeatMode === 1 ? "Repeat All" : "Repeat One"}>
