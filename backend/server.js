@@ -33,6 +33,11 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// ─── Root Route ───────────────────────────────────────────────────────────────
+app.get('/', (req, res) => {
+  res.json({ message: 'Spotify Alt Backend is running', status: 'ok' });
+});
+
 // ─── Health Check ─────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
