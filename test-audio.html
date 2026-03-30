@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Audio Proxy Test</title>
+<style>
+  body { font-family: monospace; background: #111; color: #eee; padding: 24px; }
+  button { background: #1db954; color: #000; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px; margin: 4px; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  input { background: #222; color: #eee; border: 1px solid #444; padding: 8px; border-radius: 4px; width: 420px; font-size: 14px; }
+  #log { background: #1a1a1a; border: 1px solid #333; border-radius: 6px; padding: 16px; margin-top: 16px; min-height: 200px; white-space: pre-wrap; font-size: 13px; line-height: 1.6; }
+  .ok  { color: #1db954; }
+  .err { color: #ff4444; }
+  .info{ color: #aaa; }
+  audio { width: 100%; margin-top: 16px; }
+  h2 { color: #1db954; margin-bottom: 4px; }
+</style>
+</head>
+<body>
+<h2>Audio Proxy Test</h2>
+<p class="info" style="color:#aaa;margin-top:0">Make sure backend is running on port 3001</p>
+
+<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+  <input id="vid" value="dQw4w9WgXcQ" placeholder="YouTube video ID" />
+  <button onclick="testProxy()">Test Proxy Stream</button>
+  <button onclick="testBestMatch()">Test Best-Match + Proxy</button>
+  <button onclick="clearLog()">Clear</button>
+</div>
+
+<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+  <input id="query" value="Eminem Mockingbird" placeholder="Search query for best-match test" />
+</div>
+
+<audio id="player" controls preload="none"></audio>
+
+<div id="log"></div>
+
+<script>
+const BACKEND = 'http://127.0.0.1:3001';
+const logEl = document.getElementById('log');
+const audio = document.getElementById('player');
+
+function print(msg, cls='info') {
+  const line = document.createElement('div');
+  line.className = cls;
+  line.textContent = '[' + new Date().toLocaleTimeString() + '] ' + msg;
+  logEl.appendChild(line);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function clearLog() { logEl.innerHTML = ''; }
+
+// Wire every audio event so we see exactly what the browser does
+['loadstart','progress','suspend','abort','error','emptied','stalled',
+ 'loadedmetadata','loadeddata','canplay','canplaythrough','playing',
+ 'waiting','seeking','seeked','ended','pause'].forEach(ev => {
+  audio.addEventListener(ev, () => {
+    if (ev === 'error') return; // handled separately below
+    print('audio event: ' + ev, ['playing','canplay','loadedmetadata','canplaythrough'].includes(ev) ? 'ok' : 'info');
+  });
+});
+
+audio.addEventListener('loadedmetadata', () => {
+  print('  duration=' + audio.duration.toFixed(1) + 's  readyState=' + audio.readyState, 'ok');
+});
+
+audio.addEventListener('error', () => {
+  const e = audio.error;
+  const codes = {1:'ABORTED',2:'NETWORK',3:'DECODE',4:'NOT_SUPPORTED'};
+  print('audio ERROR code=' + e?.code + ' (' + (codes[e?.code]||'?') + ') — ' + e?.message, 'err');
+  if (audio.src) {
+    print('Fetching proxy URL to inspect raw response...');
+    fetch(audio.src, { headers: { Range: 'bytes=0-1023' } })
+      .then(r => {
+        print(
+          'fetch status=' + r.status +
+          '  content-type=' + r.headers.get('content-type') +
+          '  content-length=' + r.headers.get('content-length') +
+          '  accept-ranges=' + r.headers.get('accept-ranges') +
+          '  content-range=' + r.headers.get('content-range'),
+          r.ok ? 'ok' : 'err'
+        );
+        return r.text();
+      })
+      .then(body => {
+        if (body.length < 600) print('body: ' + body, 'err');
+        else print('body: [' + body.length + ' bytes, first 100: ' + body.slice(0,100) + ']', 'info');
+      })
+      .catch(err => print('inspect fetch failed: ' + err.message, 'err'));
+  }
+});
+
+async function testProxy() {
+  const id = document.getElementById('vid').value.trim();
+  if (!id) { print('Enter a video ID', 'err'); return; }
+
+  clearLog();
+  print('=== Testing proxy stream for video ID: ' + id + ' ===');
+  const url = BACKEND + '/api/proxy-stream/' + id;
+  print('URL: ' + url);
+
+  // Step 1: probe headers before handing to audio element
+  print('--- Step 1: probing headers (Range: bytes=0-1023) ---');
+  try {
+    const r = await fetch(url, { headers: { Range: 'bytes=0-1023' } });
+    const ct  = r.headers.get('content-type');
+    const cl  = r.headers.get('content-length');
+    const cr  = r.headers.get('content-range');
+    const ar  = r.headers.get('accept-ranges');
+    print('status=' + r.status + '  content-type=' + ct + '  length=' + cl + '  range=' + cr + '  accept-ranges=' + ar, r.ok ? 'ok' : 'err');
+    if (!r.ok || !ct || !ct.startsWith('audio/')) {
+      const body = await r.text();
+      print('ERROR — not audio. Body: ' + body, 'err');
+      return;
+    }
+  } catch(e) {
+    print('Probe failed: ' + e.message, 'err');
+    return;
+  }
+
+  // Step 2: give URL to audio element
+  print('--- Step 2: audio.src = url → audio.load() → audio.play() ---');
+  audio.pause();
+  audio.removeAttribute('src');
+  audio.load();
+  audio.src = url;
+  audio.load();
+  try {
+    await audio.play();
+    print('play() resolved — audio is playing!', 'ok');
+  } catch(e) {
+    print('play() rejected: ' + e.name + ' — ' + e.message, 'err');
+  }
+}
+
+async function testBestMatch() {
+  const q = document.getElementById('query').value.trim();
+  if (!q) { print('Enter a query', 'err'); return; }
+
+  clearLog();
+  print('=== Best-match test for: "' + q + '" ===');
+  try {
+    const r = await fetch(BACKEND + '/api/best-match?q=' + encodeURIComponent(q));
+    if (!r.ok) { print('best-match failed: HTTP ' + r.status, 'err'); return; }
+    const data = await r.json();
+    print('Match: "' + data.title + '" by ' + data.artist + ' (id=' + data.id + ')', 'ok');
+    document.getElementById('vid').value = data.id;
+    await testProxy();
+  } catch(e) {
+    print('best-match error: ' + e.message, 'err');
+  }
+}
+</script>
+</body>
+</html>
