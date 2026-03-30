@@ -667,13 +667,6 @@ export function Player({
                     style={{ background: 'linear-gradient(to top, rgb(var(--support-dark-rgb) / 0.22), transparent)' }}
                 />
 
-                <div className="absolute left-0 right-0 top-0 z-20 block h-[2px] bg-border/40 md:hidden">
-                    <div
-                        className="h-full transition-all duration-300"
-                        style={{ ...progressStyle, width: `${progress}%` }}
-                    />
-                </div>
-
                 <div
                     className="relative z-10 flex h-full flex-col items-center justify-between gap-2.5 px-4 py-2.5 transition-all duration-300 md:flex-row md:gap-0 md:px-6 md:py-0"
                     style={{ paddingRight: isSidebarOpen && isLargeScreen ? `${sidebarWidth + 24}px` : undefined }}
