@@ -47,6 +47,45 @@ function normalizeCandidateIds(ids: Array<string | undefined> = [], preferredId?
     return normalized;
 }
 
+function cleanSearchTerm(value: string): string {
+    return value
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[\(\[][^\)\]]*[\)\]]/g, ' ')
+        .replace(/\b(?:feat\.?|ft\.?|featuring)\b[^,|/&-]*/gi, ' ')
+        .replace(/\b(?:official|lyrics?|audio|video|visualizer|remaster(?:ed)?|explicit|clean)\b/gi, ' ')
+        .replace(/[^\w\s&'/-]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function getPrimaryArtistName(value: string): string {
+    const cleaned = cleanSearchTerm(value);
+    const parts = cleaned
+        .split(/\s*(?:,|&|\/|\||;|\bx\b|\band\b)\s*/i)
+        .map(part => part.trim())
+        .filter(Boolean);
+
+    return parts[0] || cleaned;
+}
+
+function buildTrackQueries(track: Track): string[] {
+    const rawName = track.name.trim();
+    const rawArtist = track.artist.trim();
+    const cleanName = cleanSearchTerm(rawName);
+    const cleanArtist = cleanSearchTerm(rawArtist);
+    const primaryArtist = getPrimaryArtistName(rawArtist);
+
+    return normalizeCandidateIds([
+        `${rawName} ${rawArtist}`.trim(),
+        `${cleanName} ${cleanArtist}`.trim(),
+        `${cleanName} ${primaryArtist}`.trim(),
+        `${primaryArtist} ${cleanName}`.trim(),
+        rawName,
+        cleanName,
+    ]).filter(query => query.length > 1);
+}
+
 export function Player({
     currentTrack,
     onNext,
@@ -235,11 +274,19 @@ export function Player({
             };
         }
 
-        const query = `${track.name} ${track.artist}`;
+        const queries = buildTrackQueries(track);
+        const trackParams = new URLSearchParams({
+            title: track.name,
+            artist: track.artist,
+        });
 
-        try {
-            const res = await fetch(`${backendUrl}/api/best-match?q=${encodeURIComponent(query)}`);
-            if (res.ok) {
+        for (const query of queries) {
+            try {
+                const params = new URLSearchParams(trackParams);
+                params.set('q', query);
+                const res = await fetch(`${backendUrl}/api/best-match?${params.toString()}`);
+                if (!res.ok) continue;
+
                 const data: BestMatchResponse = await res.json();
                 const candidateIds = normalizeCandidateIds(data.candidates, data.id);
                 if (candidateIds.length > 0) {
@@ -248,22 +295,34 @@ export function Player({
                         candidates: candidateIds,
                     };
                 }
+            } catch {
+                // Fall through to broader search fallback below.
             }
-        } catch {
-            // Fall through to search fallback below.
         }
 
-        const searchRes = await fetch(`${backendUrl}/api/search?q=${encodeURIComponent(query)}`);
-        if (!searchRes.ok) throw new Error('Failed to find match');
+        for (const query of queries) {
+            for (const endpoint of ['/api/search', '/search']) {
+                try {
+                    const params = new URLSearchParams(trackParams);
+                    params.set('q', query);
+                    const searchRes = await fetch(`${backendUrl}${endpoint}?${params.toString()}`);
+                    if (!searchRes.ok) continue;
 
-        const searchResults: SearchResponseItem[] = await searchRes.json();
-        const fallbackCandidates = normalizeCandidateIds(searchResults.map(result => result.id));
-        if (fallbackCandidates.length === 0) throw new Error('No match found');
+                    const searchResults: SearchResponseItem[] = await searchRes.json();
+                    const fallbackCandidates = normalizeCandidateIds(searchResults.map(result => result.id));
+                    if (fallbackCandidates.length > 0) {
+                        return {
+                            youtubeId: fallbackCandidates[0],
+                            candidates: fallbackCandidates,
+                        };
+                    }
+                } catch {
+                    // Try the next endpoint/query variant.
+                }
+            }
+        }
 
-        return {
-            youtubeId: fallbackCandidates[0],
-            candidates: fallbackCandidates,
-        };
+        throw new Error(`Failed to find match for "${track.name}"`);
     }, [backendUrl]);
 
     useEffect(() => {

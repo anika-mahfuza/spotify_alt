@@ -146,35 +146,187 @@ function mapResults(results) {
   }));
 }
 
-function scoreResult(result, query) {
-  const q = query.toLowerCase().replace(/\s+audio$/i, '').trim();
-  const title = (result.title || '').toLowerCase();
-  const artist = (result.artist || '').toLowerCase();
+function normalizeSongQuery(value) {
+  return String(value || '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\(\[][^\)\]]*[\)\]]/g, ' ')
+    .replace(/\b(?:feat\.?|ft\.?|featuring)\b[^,|/&-]*/gi, ' ')
+    .replace(/\b(?:official|lyrics?|audio|video|visualizer|remaster(?:ed)?|clean|explicit)\b/gi, ' ')
+    .replace(/[^\w\s&'/-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function getPrimaryArtistQuery(value) {
+  const normalized = normalizeSongQuery(value);
+  return normalized
+    .split(/\s*(?:,|&|\/|\||;|\bx\b|\band\b)\s*/i)
+    .map(part => part.trim())
+    .find(Boolean) || normalized;
+}
+
+function buildSongSearchQueries(query, context = {}) {
+  const raw = String(query || '').trim();
+  const normalized = normalizeSongQuery(raw) || raw.toLowerCase();
+  const title = normalizeSongQuery(context.title);
+  const artist = normalizeSongQuery(context.artist);
+  const primaryArtist = getPrimaryArtistQuery(context.artist);
+  const structured = [title, artist].filter(Boolean).join(' ').trim();
+  const focused = structured || normalized;
+  const queries = [];
+  const seen = new Set();
+
+  const addQuery = (value) => {
+    const next = String(value || '').trim();
+    const key = next.toLowerCase();
+    if (!next || seen.has(key)) return;
+    seen.add(key);
+    queries.push(next);
+  };
+
+  addQuery(raw);
+  addQuery(normalized);
+  addQuery(structured);
+  addQuery(`${focused} song`);
+  addQuery(`${focused} music`);
+  addQuery([title, primaryArtist].filter(Boolean).join(' '));
+
+  if (raw.split(/\s+/).filter(Boolean).length < 2) {
+    addQuery(`${raw} music`);
+  }
+
+  return queries;
+}
+
+function scoreResult(result, query, context = {}) {
+  const q = normalizeSongQuery(query);
+  const qTitle = normalizeSongQuery(context.title) || q;
+  const qArtist = normalizeSongQuery(context.artist);
+  const title = normalizeSongQuery(result.title || '');
+  const artist = normalizeSongQuery(result.artist || '');
   let score = 0;
-  const qWords = q.split(/\s+/);
-  if (title.includes(q)) score += 100;
-  for (const word of qWords) {
+  const titleWords = qTitle.split(/\s+/).filter(Boolean);
+  const artistWords = qArtist.split(/\s+/).filter(Boolean);
+
+  if (qTitle && title === qTitle) score += 180;
+  if (qTitle && title.includes(qTitle)) score += 120;
+  if (q && `${artist} ${title}`.includes(q)) score += 20;
+
+  let matchedTitleWords = 0;
+  for (const word of titleWords) {
     if (word.length < 2) continue;
-    if (title.includes(word)) score += 10;
-    if (artist.includes(word)) score += 5;
+    if (title.includes(word)) {
+      score += 18;
+      matchedTitleWords += 1;
+    }
   }
-  const penalties = ['cover', 'remix', 'live', 'reaction', 'karaoke', 'instrumental', 'tutorial', 'lesson', 'slowed', 'reverb', 'sped up', '8d audio', 'bass boosted'];
-  for (const p of penalties) {
-    if (title.includes(p) && !q.includes(p)) score -= 25;
+  if (titleWords.length > 0 && titleWords.every(word => title.includes(word) || artist.includes(word))) {
+    score += 50;
   }
-  if (result.durationMs > 600000) score -= 15;
-  if (result.durationMs > 1800000) score -= 30;
-  if (title.includes('official')) score += 8;
-  if (title.includes('audio') || title.includes('lyrics')) score += 5;
+  if (matchedTitleWords >= Math.max(2, titleWords.length)) {
+    score += 20;
+  }
+
+  let matchedArtistWords = 0;
+  for (const word of artistWords) {
+    if (word.length < 2) continue;
+    if (artist.includes(word)) {
+      score += 24;
+      matchedArtistWords += 1;
+    } else if (title.includes(word)) {
+      score += 4;
+    }
+  }
+  if (artistWords.length > 0 && matchedArtistWords === artistWords.length) {
+    score += 55;
+  } else if (artistWords.length > 0 && matchedArtistWords === 0) {
+    score -= 30;
+  }
+
+  const heavyPenalties = [
+    'nightcore',
+    'slowed',
+    'reverb',
+    'sped up',
+    'edit',
+    'shorts',
+    'snippet',
+    'capcut',
+    'tiktok',
+    'mashup',
+    'amv'
+  ];
+  const mediumPenalties = [
+    'cover',
+    'remix',
+    'live',
+    'reaction',
+    'karaoke',
+    'instrumental',
+    'tutorial',
+    'lesson',
+    '8d audio',
+    'bass boosted',
+    'fan made'
+  ];
+  for (const p of heavyPenalties) {
+    if ((title.includes(p) || artist.includes(p)) && !q.includes(p)) score -= 90;
+  }
+  for (const p of mediumPenalties) {
+    if ((title.includes(p) || artist.includes(p)) && !q.includes(p)) score -= 45;
+  }
+
+  const durationMs = Number(result.durationMs) || 0;
+  if (durationMs > 0) {
+    if (durationMs < 60000) score -= 100;
+    else if (durationMs < 120000) score -= 60;
+    else if (durationMs <= 8 * 60 * 1000) score += 12;
+    else if (durationMs > 12 * 60 * 1000) score -= 20;
+    else if (durationMs > 30 * 60 * 1000) score -= 50;
+  }
+
+  if (title.includes('official audio')) score += 30;
+  else if (title.includes('official video')) score += 24;
+  else if (title.includes('official')) score += 14;
+
+  if (title.includes('provided to youtube')) score += 28;
+  if (title.includes('lyric video')) score += 10;
+  if (title.includes('lyrics')) score += 6;
+  if (artist.includes('topic')) score += 20;
+  if (artist.includes('vevo')) score += 16;
+
   return score;
 }
 
-async function doSearch(q) {
+async function doSearch(q, context = {}) {
   const yt = await getYT();
-  const safeQ = q.trim().split(/\s+/).length < 2 ? `${q} music` : q;
-  let results = await yt.search(safeQ, { limit: 25, type: 'video', safeSearch: false });
-  if (!results?.length) results = await yt.search(q, { limit: 25, type: 'video', safeSearch: false });
-  return mapResults(results);
+  const searchQueries = buildSongSearchQueries(q, context);
+  const merged = new Map();
+
+  for (const [index, searchQuery] of searchQueries.entries()) {
+    try {
+      const results = await yt.search(searchQuery, { limit: 12, type: 'video', safeSearch: false });
+      const mapped = mapResults(results);
+      const sourceBoost = Math.max(0, 10 - index * 2);
+
+      for (const result of mapped) {
+        const mergedScore = scoreResult(result, q, context) + sourceBoost;
+        const existing = merged.get(result.id);
+        if (!existing || mergedScore > existing._score) {
+          merged.set(result.id, { ...result, _score: mergedScore });
+        }
+      }
+    } catch (e) {
+      console.warn(`[Search] Query failed for "${searchQuery}":`, e.message);
+    }
+  }
+
+  return [...merged.values()]
+    .sort((a, b) => b._score - a._score)
+    .slice(0, 25)
+    .map(({ _score, ...result }) => result);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -470,10 +622,10 @@ app.get('/api/import-playlist', async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 app.get('/api/search', async (req, res) => {
-  const { q } = req.query;
+  const { q, title, artist } = req.query;
   if (!q) return res.status(400).json({ error: 'Query required' });
   try {
-    res.json(await doSearch(q));
+    res.json(await doSearch(q, { title, artist }));
   } catch (e) {
     console.error('Search error:', e.message);
     res.status(500).json({ error: e.message });
@@ -481,17 +633,18 @@ app.get('/api/search', async (req, res) => {
 });
 
 app.get('/api/best-match', async (req, res) => {
-  const { q } = req.query;
+  const { q, title, artist } = req.query;
   if (!q) return res.status(400).json({ error: 'Query required' });
   try {
-    const cacheKey = `best_match_${q.toLowerCase().trim()}`;
+    const cacheKey = `best_match_${String(q).toLowerCase().trim()}__${normalizeSongQuery(title)}__${normalizeSongQuery(artist)}`;
     const cached = getCached(cacheKey);
     if (cached) return res.json(cached);
 
-    const results = await doSearch(q);
+    const searchContext = { title, artist };
+    const results = await doSearch(q, searchContext);
     if (!results.length) return res.status(404).json({ error: 'No results found' });
 
-    const scored = results.map(r => ({ ...r, _score: scoreResult(r, q) }));
+    const scored = results.map(r => ({ ...r, _score: scoreResult(r, q, searchContext) }));
     scored.sort((a, b) => b._score - a._score);
 
     const best = scored[0];
@@ -513,10 +666,10 @@ app.get('/api/best-match', async (req, res) => {
 });
 
 app.get('/search', async (req, res) => {
-  const { q } = req.query;
+  const { q, title, artist } = req.query;
   if (!q) return res.status(400).json({ error: 'Query required' });
   try {
-    const results = await doSearch(q);
+    const results = await doSearch(q, { title, artist });
     const mapped = results.map(r => ({
       id: r.id,
       title: r.title,
