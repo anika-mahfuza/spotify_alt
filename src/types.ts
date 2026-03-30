@@ -7,6 +7,30 @@ export interface Track {
   image?: string;
   thumbnail?: string;
   isYoutube?: boolean;
+  youtubeId?: string;
+  youtubeCandidates?: string[];
+  playbackNonce?: number;
+}
+
+export interface ImportedTrack {
+  name: string;
+  artist: string;
+  album: string;
+  image: string;
+  duration: string;
+  url: string;
+}
+
+export interface ImportedPlaylist {
+  id: string;
+  name: string;
+  description?: string;
+  owner?: string;
+  image?: string;
+  trackCount: number;
+  tracks: ImportedTrack[];
+  sourceUrl: string;
+  importedAt: number;
 }
 
 export interface Playlist {
@@ -20,12 +44,6 @@ export interface Playlist {
   };
 }
 
-export interface SimplifiedArtist {
-  id: string;
-  name: string;
-  images?: Array<{ url: string }>;
-}
-
 export interface Artist {
   id: string;
   name: string;
@@ -35,9 +53,10 @@ export interface Artist {
   popularity?: number;
 }
 
-export interface RecentlyPlayedItem {
-  track: Track;
-  played_at: string;
+export interface SimplifiedArtist {
+  id: string;
+  name: string;
+  images?: Array<{ url: string }>;
 }
 
 export interface Album {
@@ -50,6 +69,17 @@ export interface Album {
   total_tracks?: number;
 }
 
+export interface SpotifyImage {
+  url: string;
+  width?: number;
+  height?: number;
+}
+
+export interface RecentlyPlayedItem {
+  track: Track;
+  played_at: string;
+}
+
 export interface BrowseCategory {
   id: string;
   name: string;
@@ -57,22 +87,11 @@ export interface BrowseCategory {
   playlists?: Playlist[];
 }
 
-export interface SpotifyImage {
-  url: string;
-  width?: number;
-  height?: number;
-}
-
 export interface UserProfile {
   display_name: string;
   email: string;
-  external_urls: {
-    spotify: string;
-  };
-  followers: {
-    href: string | null;
-    total: number;
-  };
+  external_urls: { spotify: string };
+  followers: { href: string | null; total: number };
   href: string;
   id: string;
   images: SpotifyImage[];

@@ -1,8 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useMatch, useLocation, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef, useCallback, type Dispatch, type SetStateAction } from 'react';
+import { BrowserRouter as Router, Routes, Route, useMatch, useLocation, useNavigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
-import { useAuth } from './hooks/useAuth';
-import { useSpotifyFetch } from './hooks/useSpotifyFetch';
 import { Sidebar } from './components/Sidebar';
 import { NowPlayingSidebar } from './components/NowPlayingSidebar';
 import { Player } from './components/Player';
@@ -10,11 +8,10 @@ import { Home } from './components/Home';
 import { SearchBar } from './components/SearchBar';
 import { ResultList } from './components/ResultList';
 import { config } from './config';
-import { Track, Artist } from './types';
+import { Track } from './types';
 import { Music } from 'lucide-react';
 import { extractDominantColor, normalizeAccentColor, setAccentColor } from './utils/colorExtractor';
 import { DynamicBackground } from './components/DynamicBackground';
-import { Spotlight } from './components/Spotlight';
 import './index.css';
 import './App.css';
 import './styles/global.css';
@@ -28,101 +25,14 @@ interface Video {
   uploader?: string;
 }
 
-function Login() {
-  const { login } = useAuth();
-
-  return (
-    <Spotlight className="min-h-screen w-full bg-[#0a0a0f] text-white flex flex-col">
-      {/* Logo - Minimal */}
-      <div className="absolute top-0 left-0 p-8 md:p-12 z-20">
-        <div className="flex items-center gap-3 opacity-0 animate-fade-in" style={{ animationDelay: '0.2s', animationFillMode: 'forwards' }}>
-          <div className="w-10 h-10 bg-white/10 backdrop-blur-sm rounded-full flex items-center justify-center border border-white/10">
-            <Music size={20} className="text-white" strokeWidth={2.5} />
-          </div>
-          <span className="text-xl font-semibold tracking-tight text-white/90">Spotify Alt</span>
-        </div>
-      </div>
-
-      {/* Main Content - Centered */}
-      <main className="flex-1 flex flex-col items-center justify-center text-center px-6 relative z-10 min-h-screen pt-20 pb-20">
-        {/* Headline */}
-        <h1
-          className="text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight mb-6 max-w-5xl leading-[1.1] opacity-0 animate-slide-up"
-          style={{ animationDelay: '0.5s', animationFillMode: 'forwards' }}
-        >
-          <span className="text-white">Don't just listen.</span>
-          <br />
-          <span className="text-white/40 italic font-light">Feel</span>
-          <span className="text-white"> it.</span>
-        </h1>
-
-        {/* Subheadline */}
-        <p
-          className="text-lg md:text-xl text-white/50 mb-12 max-w-xl font-normal leading-relaxed opacity-0 animate-slide-up"
-          style={{ animationDelay: '0.6s', animationFillMode: 'forwards' }}
-        >
-          Millions of tracks. One seamless experience.
-          <br className="hidden md:block" />
-          No compromises.
-        </p>
-
-        {/* Login Button */}
-        <button
-          onClick={login}
-          className="group relative opacity-0 animate-scale-in"
-          style={{ animationDelay: '0.7s', animationFillMode: 'forwards' }}
-        >
-          {/* Glow effect */}
-          <div className="absolute -inset-1 bg-gradient-to-r from-blue-600/20 via-purple-600/20 to-blue-600/20 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-
-          <div className="relative flex items-center gap-3 bg-white text-black font-semibold py-4 px-10 rounded-full text-base transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] hover:shadow-[0_0_40px_rgba(255,255,255,0.3)]">
-            <span>Continue with Spotify</span>
-            <svg
-              className="w-5 h-5 transition-transform duration-300 group-hover:translate-x-1"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-            </svg>
-          </div>
-        </button>
-
-        {/* Optional: Subtle feature hints */}
-        <div
-          className="flex flex-wrap items-center justify-center gap-4 mt-16 opacity-0 animate-fade-in"
-          style={{ animationDelay: '0.9s', animationFillMode: 'forwards' }}
-        >
-          {['Ad-free', 'High Quality', 'Offline Mode'].map((feature) => (
-            <div key={feature} className="flex items-center gap-2 text-sm text-white/30">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              <span>{feature}</span>
-            </div>
-          ))}
-        </div>
-      </main>
-
-      {/* Minimal Footer */}
-      <footer className="w-full py-6 px-8 text-center opacity-0 animate-fade-in" style={{ animationDelay: '1s', animationFillMode: 'forwards' }}>
-        <p className="text-xs text-white/20">
-          By continuing, you agree to our Terms of Service and Privacy Policy
-        </p>
-      </footer>
-    </Spotlight>
-  );
-}
-
 interface MainContentProps {
   currentTrack: Track | null;
-  setCurrentTrack: (track: Track | null) => void;
-  setArtistDetails: (artist: Artist | null) => void;
+  setCurrentTrack: Dispatch<SetStateAction<Track | null>>;
   isNowPlayingSidebarOpen: boolean;
   setIsNowPlayingSidebarOpen: (isOpen: boolean) => void;
   sidebarWidth: number;
   queue: Track[];
-  setQueue: (queue: Track[]) => void;
+  setQueue: Dispatch<SetStateAction<Track[]>>;
   currentIndex: number;
   setCurrentIndex: (index: number) => void;
   onToggleMenu: () => void;
@@ -131,7 +41,6 @@ interface MainContentProps {
 function MainContent({
   currentTrack,
   setCurrentTrack,
-  setArtistDetails,
   isNowPlayingSidebarOpen,
   setIsNowPlayingSidebarOpen,
   sidebarWidth,
@@ -143,28 +52,19 @@ function MainContent({
 }: MainContentProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [playingContextId, setPlayingContextId] = useState<string | null>(null);
-  // Removed local color state as it is now passed via props
-
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Video[]>([]);
   const [isSearchLoading, setIsSearchLoading] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const didRestoreLastPath = useRef(false);
-
-  const { token } = useAuth();
-  const fetchWithAuth = useSpotifyFetch();
+  const replayNonceRef = useRef(0);
 
   const matchPlaylist = useMatch('/playlist/:id');
-  const matchAlbum = useMatch('/album/:id');
-  const matchArtist = useMatch('/artist/:id');
-  const matchLikedSongs = useMatch('/collection/tracks');
   const location = useLocation();
   const navigate = useNavigate();
-  const activePlaylistId = matchPlaylist?.params.id || (matchLikedSongs ? 'liked-songs' : null);
-  const activeAlbumId = matchAlbum?.params.id || null;
-  const activeArtistId = matchArtist?.params.id || null;
+  const activePlaylistId = matchPlaylist?.params.id || null;
 
-  // Restore last visited page on mount
+  // Restore last visited page
   useEffect(() => {
     if (didRestoreLastPath.current) return;
     didRestoreLastPath.current = true;
@@ -174,14 +74,13 @@ function MainContent({
     }
   }, [location.pathname, navigate]);
 
-  // Save current path to localStorage
   useEffect(() => {
     if (location.pathname !== '/login' && location.pathname !== '/logout') {
       localStorage.setItem('last_visited_path', location.pathname);
     }
   }, [location.pathname]);
 
-  // Save current track to localStorage
+  // Persist player state
   useEffect(() => {
     if (currentTrack) {
       localStorage.setItem('player_current_track', JSON.stringify(currentTrack));
@@ -190,7 +89,6 @@ function MainContent({
     }
   }, [currentTrack]);
 
-  // Save queue to localStorage
   useEffect(() => {
     if (queue.length > 0) {
       localStorage.setItem('player_queue', JSON.stringify(queue));
@@ -199,53 +97,20 @@ function MainContent({
     }
   }, [queue]);
 
-  // Save current index to localStorage
   useEffect(() => {
     localStorage.setItem('player_current_index', currentIndex.toString());
   }, [currentIndex]);
-
-
-
-  useEffect(() => {
-    let isActive = true;
-
-    if (currentTrack && currentTrack.artist) {
-      const fetchArtistDetails = async () => {
-        try {
-          const artistName = currentTrack.artist.split(',')[0].trim();
-          // Use fetchWithAuth instead of direct fetch
-          const response = await fetchWithAuth(`${config.API_URL}/artist-details?artistName=${encodeURIComponent(artistName)}`);
-          const data = await response.json();
-
-          if (!isActive) return;
-
-          const isValidArtist =
-            data &&
-            typeof data === 'object' &&
-            typeof (data as { name?: unknown }).name === 'string' &&
-            (data as { name: string }).name.trim().length > 0;
-          setArtistDetails(isValidArtist ? data : null);
-        } catch (error) {
-          if (!isActive) return;
-          console.error("Failed to fetch artist details", error);
-          setArtistDetails(null);
-        }
-      };
-      fetchArtistDetails();
-    } else {
-      setArtistDetails(null);
-    }
-
-    return () => {
-      isActive = false;
-    };
-  }, [currentTrack?.artist, token, setArtistDetails, fetchWithAuth]);
 
   useEffect(() => {
     setSearchQuery('');
     setSearchResults([]);
     setShowSearchResults(false);
   }, [location.pathname]);
+
+  const withReplayNonce = (track: Track): Track => ({
+    ...track,
+    playbackNonce: ++replayNonceRef.current,
+  });
 
   const handleTrackSelect = (track: Track, playlist: Track[] = [], contextId?: string) => {
     setCurrentTrack(track);
@@ -255,49 +120,46 @@ function MainContent({
     setCurrentIndex(index >= 0 ? index : 0);
   };
 
+  const handleResolveTrackPlayback = useCallback((trackId: string, updates: Pick<Track, 'youtubeId' | 'youtubeCandidates'>) => {
+    setQueue(prev => prev.map(track => (
+      track.id === trackId ? { ...track, ...updates } : track
+    )));
+
+    setCurrentTrack(prev => {
+      if (!prev || prev.id !== trackId) return prev;
+      return { ...prev, ...updates };
+    });
+  }, [setCurrentTrack, setQueue]);
+
   const handleNext = (isShuffle?: boolean, repeatMode?: number) => {
     if (queue.length === 0) return;
 
-    // Repeat-One (mode 2) is handled entirely in Player.tsx handleEnded
-    // When user manually clicks next during repeat-one, we advance normally
-
     if (isShuffle) {
-      // Shuffle: pick a random track that isn't the current one
       if (queue.length === 1) {
-        // Single track: force replay by creating a new track reference
         setCurrentIndex(0);
-        setCurrentTrack({ ...queue[0] });
+        setCurrentTrack(withReplayNonce(queue[0]));
         return;
       }
       let nextIndex: number;
-      do {
-        nextIndex = Math.floor(Math.random() * queue.length);
-      } while (nextIndex === currentIndex);
+      do { nextIndex = Math.floor(Math.random() * queue.length); } while (nextIndex === currentIndex);
       setCurrentIndex(nextIndex);
       setCurrentTrack(queue[nextIndex]);
       return;
     }
 
-    // Sequential (no shuffle)
     const nextIndex = currentIndex + 1;
-
     if (nextIndex >= queue.length) {
-      // We've reached the end of the queue
       if (repeatMode === 1) {
-        // Repeat-All: wrap to beginning
         if (queue.length === 1) {
-          // Single track: force replay with new reference
           setCurrentIndex(0);
-          setCurrentTrack({ ...queue[0] });
+          setCurrentTrack(withReplayNonce(queue[0]));
         } else {
           setCurrentIndex(0);
           setCurrentTrack(queue[0]);
         }
       }
-      // No repeat (mode 0): do nothing — playback stops naturally
       return;
     }
-
     setCurrentIndex(nextIndex);
     setCurrentTrack(queue[nextIndex]);
   };
@@ -306,42 +168,32 @@ function MainContent({
     if (queue.length === 0) return;
 
     if (isShuffle) {
-      // Shuffle: pick a random track that isn't the current one
       if (queue.length === 1) {
-        // Single track: force replay
         setCurrentIndex(0);
-        setCurrentTrack({ ...queue[0] });
+        setCurrentTrack(withReplayNonce(queue[0]));
         return;
       }
       let prevIndex: number;
-      do {
-        prevIndex = Math.floor(Math.random() * queue.length);
-      } while (prevIndex === currentIndex);
+      do { prevIndex = Math.floor(Math.random() * queue.length); } while (prevIndex === currentIndex);
       setCurrentIndex(prevIndex);
       setCurrentTrack(queue[prevIndex]);
       return;
     }
 
-    // Sequential (no shuffle)
     const prevIndex = currentIndex - 1;
-
     if (prevIndex < 0) {
-      // We're at the start of the queue
       if (repeatMode === 1) {
-        // Repeat-All: wrap to end
         const lastIndex = queue.length - 1;
         if (queue.length === 1) {
           setCurrentIndex(0);
-          setCurrentTrack({ ...queue[0] });
+          setCurrentTrack(withReplayNonce(queue[0]));
         } else {
           setCurrentIndex(lastIndex);
           setCurrentTrack(queue[lastIndex]);
         }
       }
-      // No repeat (mode 0): do nothing
       return;
     }
-
     setCurrentIndex(prevIndex);
     setCurrentTrack(queue[prevIndex]);
   };
@@ -369,7 +221,6 @@ function MainContent({
   };
 
   const handleSearchResultSelect = (video: { id: string, title: string, uploader?: string, thumbnail?: string, duration?: number }) => {
-    // Check if we are already playing this track
     if (currentTrack?.id === video.id) {
       setIsPlaying(!isPlaying);
       return;
@@ -382,10 +233,11 @@ function MainContent({
       album: 'YouTube Video',
       duration_ms: (video.duration || 0) * 1000,
       thumbnail: video.thumbnail,
-      isYoutube: true
+      isYoutube: true,
+      youtubeId: video.id,
+      youtubeCandidates: [video.id],
     };
 
-    // Build queue from all search results so prev/next works
     const fullQueue: Track[] = searchResults.map(v => ({
       id: v.id,
       name: v.title,
@@ -393,13 +245,12 @@ function MainContent({
       album: 'YouTube Video',
       duration_ms: (v.duration || 0) * 1000,
       thumbnail: v.thumbnail,
-      isYoutube: true
+      isYoutube: true,
+      youtubeId: v.id,
+      youtubeCandidates: [v.id],
     }));
 
-    const index = fullQueue.findIndex(t => t.id === track.id);
-    setCurrentTrack(track);
-    setQueue(fullQueue);
-    setCurrentIndex(index >= 0 ? index : 0);
+    handleTrackSelect(track, fullQueue);
   };
 
   const clearSearch = () => {
@@ -410,7 +261,6 @@ function MainContent({
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden relative z-10">
-      {/* Search Bar Header */}
       <div className="sticky top-0 z-20 px-6 py-4 border-b border-white/10 bg-black/30 backdrop-blur-3xl">
         <SearchBar
           value={searchQuery}
@@ -423,33 +273,24 @@ function MainContent({
           }}
           onSearch={handleSearch}
           isLoading={isSearchLoading}
-          showHomeButton={!!(activePlaylistId || activeAlbumId)}
+          showHomeButton={!!activePlaylistId}
           onToggleMenu={onToggleMenu}
         />
       </div>
 
-      {/* Content Area */}
       <div className="flex-1 overflow-y-auto scrollbar-thin pb-[calc(160px+env(safe-area-inset-bottom))] md:pb-32">
         <div className={showSearchResults ? "block" : "hidden"}>
           <div className="px-8 py-6 animate-fadeIn">
             <div className="flex items-center justify-between mb-8">
               <div>
-                <h2 className="text-3xl font-bold text-white mb-2">
-                  Search Results
-                </h2>
+                <h2 className="text-3xl font-bold text-white mb-2">Search Results</h2>
                 <p className="text-text-secondary">
                   Showing results for "<span className="text-white font-medium">{searchQuery}</span>"
                 </p>
               </div>
               <button
                 onClick={clearSearch}
-                className="
-                  px-6 py-3 rounded-full
-                  bg-[#121212] hover:bg-[#1a1a1a]
-                  text-text-secondary hover:text-white
-                  transition-all hover:scale-105
-                  flex items-center gap-2
-                "
+                className="px-6 py-3 rounded-full bg-[#121212] hover:bg-[#1a1a1a] text-text-secondary hover:text-white transition-all hover:scale-105 flex items-center gap-2"
               >
                 ← Back to Library
               </button>
@@ -482,8 +323,6 @@ function MainContent({
         <div className={showSearchResults ? "hidden" : "block"}>
           <Home
             activePlaylistId={activePlaylistId}
-            activeAlbumId={activeAlbumId}
-            activeArtistId={activeArtistId}
             onTrackSelect={handleTrackSelect}
             currentTrack={currentTrack}
             isPlaying={isPlaying}
@@ -493,7 +332,6 @@ function MainContent({
         </div>
       </div>
 
-      {/* Player */}
       <Player
         currentTrack={currentTrack}
         nextTrack={queue.length > 0 ? queue[(currentIndex + 1) % queue.length] : null}
@@ -502,6 +340,7 @@ function MainContent({
         backendUrl={config.API_URL}
         isPlaying={isPlaying}
         setIsPlaying={setIsPlaying}
+        onResolveTrackPlayback={handleResolveTrackPlayback}
         onToggleNowPlaying={() => setIsNowPlayingSidebarOpen(!isNowPlayingSidebarOpen)}
         isSidebarOpen={isNowPlayingSidebarOpen}
         sidebarWidth={sidebarWidth}
@@ -514,23 +353,18 @@ function MainLayout() {
   const [isNowPlayingSidebarOpen, setIsNowPlayingSidebarOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
-    // Load saved width from localStorage, default to 320
     const savedWidth = localStorage.getItem('now_playing_sidebar_width');
     if (savedWidth) {
       const parsed = parseInt(savedWidth, 10);
-      // Ensure width is within valid range
-      if (parsed >= 280 && parsed <= 600) {
-        return parsed;
-      }
+      if (parsed >= 280 && parsed <= 600) return parsed;
     }
-    return 320; // Default width
+    return 320;
   });
-  // Restore last played track from localStorage on app start
+
   const [currentTrack, setCurrentTrack] = useState<Track | null>(() => {
     const saved = localStorage.getItem('player_current_track');
     return saved ? JSON.parse(saved) : null;
   });
-  const [artistDetails, setArtistDetails] = useState<Artist | null>(null);
   const [queue, setQueue] = useState<Track[]>(() => {
     const saved = localStorage.getItem('player_queue');
     return saved ? JSON.parse(saved) : [];
@@ -539,33 +373,24 @@ function MainLayout() {
     const saved = localStorage.getItem('player_current_index');
     return saved ? parseInt(saved) : 0;
   });
-  // Extract colors from current track (Hazy-style)
+
+  // Extract colors from current track
   useEffect(() => {
     const extractColors = async () => {
-      if (!currentTrack) {
-        setAccentColor('#ffffff'); // White as default
-        return;
-      }
-
+      if (!currentTrack) { setAccentColor('#ffffff'); return; }
       const imageUrl = currentTrack.image || currentTrack.thumbnail;
-      if (!imageUrl) {
-        setAccentColor('#ffffff');
-        return;
-      }
-
+      if (!imageUrl) { setAccentColor('#ffffff'); return; }
       try {
         const hexColor = await extractDominantColor(imageUrl);
         const safeColor = normalizeAccentColor(hexColor);
         setAccentColor(safeColor);
-      } catch (error) {
-        console.error('Failed to extract colors:', error);
+      } catch {
         setAccentColor('#ffffff');
       }
     };
     extractColors();
   }, [currentTrack]);
 
-  // Save sidebar width to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem('now_playing_sidebar_width', sidebarWidth.toString());
   }, [sidebarWidth]);
@@ -578,7 +403,6 @@ function MainLayout() {
 
   const handleRemoveFromQueue = (index: number) => {
     if (index < 0 || index >= queue.length) return;
-
     const newQueue = [...queue];
     newQueue.splice(index, 1);
     setQueue(newQueue);
@@ -603,17 +427,11 @@ function MainLayout() {
 
   return (
     <div className="flex h-screen w-screen text-white overflow-hidden relative">
-      {/* Global dynamic background */}
       <DynamicBackground currentTrack={currentTrack} />
-
-      <Sidebar
-        isOpen={isMobileMenuOpen}
-        onClose={() => setIsMobileMenuOpen(false)}
-      />
+      <Sidebar isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
       <MainContent
         currentTrack={currentTrack}
         setCurrentTrack={setCurrentTrack}
-        setArtistDetails={setArtistDetails}
         isNowPlayingSidebarOpen={isNowPlayingSidebarOpen}
         setIsNowPlayingSidebarOpen={setIsNowPlayingSidebarOpen}
         sidebarWidth={sidebarWidth}
@@ -626,7 +444,7 @@ function MainLayout() {
       {isNowPlayingSidebarOpen && (
         <NowPlayingSidebar
           currentTrack={currentTrack}
-          artistDetails={artistDetails}
+          artistDetails={null}
           onClose={() => setIsNowPlayingSidebarOpen(false)}
           queue={queue}
           currentIndex={currentIndex}
@@ -640,43 +458,18 @@ function MainLayout() {
   );
 }
 
-function LogoutPage() {
-  const { logout } = useAuth();
-  useEffect(() => {
-    // Clear player state on logout
-    localStorage.removeItem('player_current_track');
-    localStorage.removeItem('player_queue');
-    localStorage.removeItem('player_current_index');
-    localStorage.removeItem('player_last_position');
-    localStorage.removeItem('last_visited_path');
-    logout();
-  }, [logout]);
-  return <Navigate to="/login" replace />;
-}
-
 function App() {
   return (
     <AuthProvider>
       <Router>
         <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/logout" element={<LogoutPage />} />
-          <Route path="/album/:id" element={<RequireAuth><MainLayout /></RequireAuth>} />
-          <Route path="/playlist/:id" element={<RequireAuth><MainLayout /></RequireAuth>} />
-          <Route path="/artist/:id" element={<RequireAuth><MainLayout /></RequireAuth>} />
-          <Route path="/collection/tracks" element={<RequireAuth><MainLayout /></RequireAuth>} />
-          <Route path="/" element={<RequireAuth><MainLayout /></RequireAuth>} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="/playlist/:id" element={<MainLayout />} />
+          <Route path="/" element={<MainLayout />} />
+          <Route path="*" element={<MainLayout />} />
         </Routes>
       </Router>
     </AuthProvider>
   );
-}
-
-function RequireAuth({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth();
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
-  return <>{children}</>;
 }
 
 export default App;
