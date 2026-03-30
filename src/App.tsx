@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, type Dispatch, type SetStateAction } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, type Dispatch, type SetStateAction } from 'react';
 import { BrowserRouter as Router, Routes, Route, useMatch, useLocation, useNavigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { Sidebar } from './components/Sidebar';
@@ -8,7 +8,7 @@ import { Home } from './components/Home';
 import { SearchBar } from './components/SearchBar';
 import { ResultList } from './components/ResultList';
 import { config } from './config';
-import { Track } from './types';
+import { Artist, ImportedPlaylist, Track } from './types';
 import { ChevronUp, Music } from 'lucide-react';
 import { applyAlbumTheme, DEFAULT_ALBUM_THEME, extractAlbumTheme } from './utils/colorExtractor';
 import { DynamicBackground } from './components/DynamicBackground';
@@ -25,9 +25,98 @@ interface Video {
   uploader?: string;
 }
 
+function extractSpotifyTrackId(url?: string): string | undefined {
+  if (!url) return undefined;
+  const match = url.match(/track\/([a-zA-Z0-9]+)/);
+  return match?.[1];
+}
+
+function normalizeLookup(value?: string): string {
+  return String(value || '').trim().toLowerCase();
+}
+
+function getImportedPlaylistsSnapshot(): ImportedPlaylist[] {
+  if (typeof window === 'undefined') return [];
+
+  try {
+    const raw = window.localStorage.getItem('imported_playlists');
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function enrichTrackWithImportedMetadata(track: Track | null): Track | null {
+  if (!track || track.isYoutube) return track;
+  if (track.artistId && track.spotifyTrackId) return track;
+
+  const targetName = normalizeLookup(track.name);
+  const targetArtist = normalizeLookup(track.artist);
+  const targetAlbum = normalizeLookup(track.album);
+
+  for (const playlist of getImportedPlaylistsSnapshot()) {
+    for (const importedTrack of playlist.tracks) {
+      const sameName = normalizeLookup(importedTrack.name) === targetName;
+      const sameArtist = normalizeLookup(importedTrack.artist) === targetArtist;
+      const sameAlbum = !targetAlbum || normalizeLookup(importedTrack.album) === targetAlbum;
+
+      if (!sameName || !sameArtist || !sameAlbum) continue;
+
+      const artistIds = importedTrack.artistIds?.filter(Boolean);
+      const spotifyTrackId = importedTrack.spotifyTrackId || extractSpotifyTrackId(importedTrack.url);
+      const nextArtistId = track.artistId || importedTrack.artistId || artistIds?.[0];
+      const nextArtistIds = track.artistIds?.length ? track.artistIds : artistIds;
+      const nextSpotifyTrackId = track.spotifyTrackId || spotifyTrackId;
+      const nextSpotifyUrl = track.spotifyUrl || importedTrack.url || undefined;
+
+      if (
+        nextArtistId === track.artistId &&
+        nextArtistIds === track.artistIds &&
+        nextSpotifyTrackId === track.spotifyTrackId &&
+        nextSpotifyUrl === track.spotifyUrl
+      ) {
+        return track;
+      }
+
+      return {
+        ...track,
+        artistId: nextArtistId,
+        artistIds: nextArtistIds,
+        spotifyTrackId: nextSpotifyTrackId,
+        spotifyUrl: nextSpotifyUrl,
+      };
+    }
+  }
+
+  return track;
+}
+
+function buildArtistTopTrackQueue(artistDetails: Artist | null): Track[] {
+  if (!artistDetails?.topTracks?.length) return [];
+
+  return artistDetails.topTracks.map(track => {
+    const artistIds = track.artistIds?.filter(Boolean);
+
+    return {
+      id: track.id,
+      name: track.name,
+      artist: track.artist || artistDetails.name,
+      album: `${artistDetails.name} top tracks`,
+      duration_ms: track.duration_ms || 0,
+      image: track.image || artistDetails.images?.[0]?.url,
+      artistId: track.artistId || artistIds?.[0] || artistDetails.id,
+      artistIds: artistIds?.length ? artistIds : artistDetails.id ? [artistDetails.id] : undefined,
+      spotifyTrackId: track.id,
+      spotifyUrl: `https://open.spotify.com/track/${track.id}`,
+    };
+  });
+}
+
 interface MainContentProps {
   currentTrack: Track | null;
   setCurrentTrack: Dispatch<SetStateAction<Track | null>>;
+  isPlaying: boolean;
+  setIsPlaying: Dispatch<SetStateAction<boolean>>;
   isNowPlayingSidebarOpen: boolean;
   setIsNowPlayingSidebarOpen: (isOpen: boolean) => void;
   sidebarWidth: number;
@@ -41,6 +130,8 @@ interface MainContentProps {
 function MainContent({
   currentTrack,
   setCurrentTrack,
+  isPlaying,
+  setIsPlaying,
   isNowPlayingSidebarOpen,
   setIsNowPlayingSidebarOpen,
   sidebarWidth,
@@ -50,13 +141,12 @@ function MainContent({
   setCurrentIndex,
   onToggleMenu
 }: MainContentProps) {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [playingContextId, setPlayingContextId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Video[]>([]);
   const [isSearchLoading, setIsSearchLoading] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [showScrollToTop, setShowScrollToTop] = useState(false);
+  const [isLargeScreen, setIsLargeScreen] = useState(() => window.innerWidth >= 1024);
   const didRestoreLastPath = useRef(false);
   const replayNonceRef = useRef(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -81,6 +171,12 @@ function MainContent({
       localStorage.setItem('last_visited_path', location.pathname);
     }
   }, [location.pathname]);
+
+  useEffect(() => {
+    const handleResize = () => setIsLargeScreen(window.innerWidth >= 1024);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Persist player state
   useEffect(() => {
@@ -114,10 +210,9 @@ function MainContent({
     playbackNonce: ++replayNonceRef.current,
   });
 
-  const handleTrackSelect = (track: Track, playlist: Track[] = [], contextId?: string) => {
+  const handleTrackSelect = (track: Track, playlist: Track[] = []) => {
     setCurrentTrack(track);
     setQueue(playlist);
-    setPlayingContextId(contextId || null);
     const index = playlist.findIndex(t => t.id === track.id);
     setCurrentIndex(index >= 0 ? index : 0);
   };
@@ -361,7 +456,6 @@ function MainContent({
             currentTrack={currentTrack}
             isPlaying={isPlaying}
             setIsPlaying={setIsPlaying}
-            playingContextId={playingContextId}
           />
         </div>
       </div>
@@ -372,6 +466,7 @@ function MainContent({
         className={`app-button-secondary fixed bottom-[calc(7rem+env(safe-area-inset-bottom))] right-4 z-30 flex h-10 w-10 items-center justify-center rounded-full shadow-card transition-all duration-200 md:bottom-28 md:right-6 ${
           showScrollToTop ? 'pointer-events-auto translate-y-0 opacity-100' : 'pointer-events-none translate-y-3 opacity-0'
         }`}
+        style={{ right: isNowPlayingSidebarOpen && isLargeScreen ? `${sidebarWidth + 24}px` : undefined }}
         aria-label="Scroll to top"
         title="Scroll to top"
       >
@@ -398,6 +493,7 @@ function MainContent({
 function MainLayout() {
   const [isNowPlayingSidebarOpen, setIsNowPlayingSidebarOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const savedWidth = localStorage.getItem('now_playing_sidebar_width');
     if (savedWidth) {
@@ -409,16 +505,21 @@ function MainLayout() {
 
   const [currentTrack, setCurrentTrack] = useState<Track | null>(() => {
     const saved = localStorage.getItem('player_current_track');
-    return saved ? JSON.parse(saved) : null;
+    return enrichTrackWithImportedMetadata(saved ? JSON.parse(saved) : null);
   });
+  const [artistDetails, setArtistDetails] = useState<Artist | null>(null);
   const [queue, setQueue] = useState<Track[]>(() => {
     const saved = localStorage.getItem('player_queue');
-    return saved ? JSON.parse(saved) : [];
+    return saved ? JSON.parse(saved).map((track: Track) => enrichTrackWithImportedMetadata(track) || track) : [];
   });
   const [currentIndex, setCurrentIndex] = useState(() => {
     const saved = localStorage.getItem('player_current_index');
     return saved ? parseInt(saved) : 0;
   });
+  const artistTopTrackQueue = useMemo(() => buildArtistTopTrackQueue(artistDetails), [artistDetails]);
+  const artistDetailsLookupKey = currentTrack
+    ? `${currentTrack.artistId || ''}__${currentTrack.spotifyTrackId || ''}__${currentTrack.id || ''}`
+    : '';
 
   // Extract colors from current track
   useEffect(() => {
@@ -459,6 +560,73 @@ function MainLayout() {
     localStorage.setItem('now_playing_sidebar_width', sidebarWidth.toString());
   }, [sidebarWidth]);
 
+  useEffect(() => {
+    const enrichedCurrentTrack = enrichTrackWithImportedMetadata(currentTrack);
+    if (enrichedCurrentTrack !== currentTrack) {
+      setCurrentTrack(enrichedCurrentTrack);
+    }
+  }, [currentTrack]);
+
+  useEffect(() => {
+    setQueue(prev => {
+      let changed = false;
+      const next = prev.map(track => {
+        const enriched = enrichTrackWithImportedMetadata(track) || track;
+        if (enriched !== track) changed = true;
+        return enriched;
+      });
+      return changed ? next : prev;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!isNowPlayingSidebarOpen || !currentTrack || currentTrack.isYoutube) {
+      setArtistDetails(null);
+      return;
+    }
+
+    const params = new URLSearchParams();
+    if (currentTrack.artistId) {
+      params.set('artistId', currentTrack.artistId);
+    }
+    if (currentTrack.spotifyTrackId) {
+      params.set('trackId', currentTrack.spotifyTrackId);
+    }
+
+    if (!params.toString()) {
+      setArtistDetails(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    setArtistDetails(null);
+
+    const loadArtistDetails = async () => {
+      try {
+        const response = await fetch(`${config.API_URL}/api/artist-details?${params.toString()}`, {
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`Artist details request failed: ${response.status}`);
+        }
+
+        const data: Artist = await response.json();
+        setArtistDetails(data);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        console.error('Artist details fetch failed', error);
+        setArtistDetails(null);
+      }
+    };
+
+    loadArtistDetails();
+
+    return () => {
+      controller.abort();
+    };
+  }, [artistDetailsLookupKey, isNowPlayingSidebarOpen, currentTrack]);
+
   const handleSelectQueueIndex = (index: number) => {
     if (index < 0 || index >= queue.length) return;
     setCurrentIndex(index);
@@ -489,6 +657,22 @@ function MainLayout() {
     }
   };
 
+  const handlePlayArtistTopTrack = useCallback((index: number) => {
+    const track = artistTopTrackQueue[index];
+    if (!track) return;
+
+    const isSameTrack = currentTrack?.spotifyTrackId === track.id || currentTrack?.id === track.id;
+
+    if (isSameTrack) {
+      setIsPlaying(value => !value);
+      return;
+    }
+
+    setQueue(artistTopTrackQueue);
+    setCurrentIndex(index);
+    setCurrentTrack(track);
+  }, [artistTopTrackQueue, currentTrack]);
+
   return (
     <div className="flex h-screen w-screen text-text-primary overflow-hidden relative bg-bg-base">
       <DynamicBackground currentTrack={currentTrack} />
@@ -496,6 +680,8 @@ function MainLayout() {
       <MainContent
         currentTrack={currentTrack}
         setCurrentTrack={setCurrentTrack}
+        isPlaying={isPlaying}
+        setIsPlaying={setIsPlaying}
         isNowPlayingSidebarOpen={isNowPlayingSidebarOpen}
         setIsNowPlayingSidebarOpen={setIsNowPlayingSidebarOpen}
         sidebarWidth={sidebarWidth}
@@ -508,12 +694,14 @@ function MainLayout() {
       {isNowPlayingSidebarOpen && (
         <NowPlayingSidebar
           currentTrack={currentTrack}
-          artistDetails={null}
+          artistDetails={artistDetails}
+          isPlaying={isPlaying}
           onClose={() => setIsNowPlayingSidebarOpen(false)}
           queue={queue}
           currentIndex={currentIndex}
           onSelectQueueIndex={handleSelectQueueIndex}
           onRemoveFromQueue={handleRemoveFromQueue}
+          onPlayArtistTopTrack={handlePlayArtistTopTrack}
           width={sidebarWidth}
           setWidth={setSidebarWidth}
         />

@@ -74,14 +74,14 @@ export const SearchBar = ({ onSearch, isLoading, value, onChange, showHomeButton
 
         <form onSubmit={handleSubmit} className="relative">
           <div
-            className={`app-input-shell flex items-center overflow-hidden rounded-full transition-all duration-200 ease-out ${isExpanded ? 'w-[min(28rem,70vw)]' : 'h-11 w-11 cursor-pointer'}`}
+            className={`app-input-shell flex items-center overflow-hidden rounded-full transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${isExpanded ? 'w-[min(28rem,70vw)]' : 'h-11 w-11 cursor-pointer'}`}
             onClick={!isExpanded ? handleExpand : undefined}
           >
             <div className={`flex items-center justify-center shrink-0 ${isExpanded ? 'pl-4' : 'h-11 w-11'}`}>
               <Search size={18} className={isExpanded ? 'text-text-secondary' : 'text-text-primary'} />
             </div>
 
-            <div className={`flex-1 overflow-hidden transition-all duration-200 ${isExpanded ? 'opacity-100' : 'w-0 opacity-0'}`}>
+            <div className={`flex-1 overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${isExpanded ? 'opacity-100' : 'w-0 opacity-0'}`}>
               <input
                 ref={inputRef}
                 type="text"

@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ExternalLink, Music, Trash2, X } from 'lucide-react';
 import { Artist, Track } from '../types';
+import { SolidPauseIcon, SolidPlayIcon } from './PlaybackIcons';
 
 interface NowPlayingSidebarProps {
   currentTrack: Track | null;
   artistDetails: Artist | null;
+  isPlaying: boolean;
   onClose: () => void;
   queue?: Track[];
   currentIndex?: number;
   onSelectQueueIndex?: (index: number) => void;
   onRemoveFromQueue?: (index: number) => void;
+  onPlayArtistTopTrack?: (index: number) => void;
   width: number;
   setWidth: (width: number) => void;
 }
@@ -17,18 +20,22 @@ interface NowPlayingSidebarProps {
 export function NowPlayingSidebar({
   currentTrack,
   artistDetails,
+  isPlaying,
   onClose,
   queue = [],
   currentIndex = 0,
   onSelectQueueIndex,
   onRemoveFromQueue,
+  onPlayArtistTopTrack,
   width,
   setWidth,
 }: NowPlayingSidebarProps) {
   const [showAllQueue, setShowAllQueue] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
+  const [hoveredTopTrack, setHoveredTopTrack] = useState<string | null>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleResize = () => setIsDesktop(window.innerWidth >= 1024);
@@ -67,6 +74,10 @@ export function NowPlayingSidebar({
       window.removeEventListener('mouseup', stopResizing);
     };
   }, [isResizing, resize, stopResizing]);
+
+  useEffect(() => {
+    contentRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+  }, [currentTrack?.id, currentTrack?.spotifyTrackId]);
 
   const coverUrl = currentTrack?.image || currentTrack?.thumbnail;
 
@@ -115,7 +126,7 @@ export function NowPlayingSidebar({
         </div>
 
         {currentTrack ? (
-          <div className="flex-1 overflow-y-auto">
+          <div ref={contentRef} className="flex-1 overflow-y-auto">
             <div className="overflow-hidden rounded-[26px] app-panel shadow-elevated">
               {coverUrl ? (
                 <img src={coverUrl} alt={currentTrack.name} className="aspect-square w-full object-cover" />
@@ -147,6 +158,9 @@ export function NowPlayingSidebar({
                 <div className="mt-4 flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <h5 className="truncate text-base font-bold text-text-primary">{artistDetails.name}</h5>
+                    {artistDetails.subtitle ? (
+                      <p className="mt-1 text-sm text-text-secondary">{artistDetails.subtitle}</p>
+                    ) : null}
                     {artistDetails.followers?.total !== undefined ? (
                       <p className="mt-1 text-sm text-text-secondary">
                         {artistDetails.followers.total.toLocaleString()} followers
@@ -159,7 +173,7 @@ export function NowPlayingSidebar({
 
                   {artistDetails.id ? (
                     <a
-                      href={`https://open.spotify.com/artist/${artistDetails.id}`}
+                      href={artistDetails.externalUrl || `https://open.spotify.com/artist/${artistDetails.id}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="app-button-secondary inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium"
@@ -169,6 +183,84 @@ export function NowPlayingSidebar({
                       Open
                     </a>
                   ) : null}
+                </div>
+
+                {artistDetails.bio ? (
+                  <div className="mt-4">
+                    <p className="text-sm leading-6 text-text-secondary">
+                      {artistDetails.bio}
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {artistDetails?.topTracks?.length ? (
+              <div className="mt-6 rounded-[24px] app-panel p-4">
+                <div className="mb-4 flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-text-muted">Top tracks</h4>
+                    <p className="mt-1 text-xs text-text-secondary">From Spotify artist embed</p>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  {artistDetails.topTracks.slice(0, 5).map((track, index) => {
+                    const isActiveTrack = currentTrack?.spotifyTrackId === track.id || currentTrack?.id === track.id;
+                    const showPlaybackIcon = hoveredTopTrack === track.id || isActiveTrack;
+
+                    return (
+                      <button
+                        key={`${track.id}-${index}`}
+                        type="button"
+                        onClick={() => onPlayArtistTopTrack?.(index)}
+                        onMouseEnter={() => setHoveredTopTrack(track.id)}
+                        onMouseLeave={() => setHoveredTopTrack(null)}
+                        className={`flex w-full items-center gap-3 rounded-[16px] p-2 text-left transition-all ${
+                          isActiveTrack
+                            ? 'app-card bg-[rgb(var(--accent-color-rgb)/0.16)]'
+                            : 'app-card app-card-hover'
+                        }`}
+                      >
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center text-text-muted">
+                          {showPlaybackIcon ? (
+                            <span className={`flex h-8 w-8 items-center justify-center rounded-full ${isActiveTrack ? 'app-button-primary' : 'app-icon-button'}`}>
+                              {isActiveTrack && isPlaying ? (
+                                <SolidPauseIcon className={`h-3.5 w-3.5 ${isActiveTrack ? 'text-primary-foreground' : 'text-text-primary'}`} />
+                              ) : (
+                                <SolidPlayIcon className={`h-3.5 w-3.5 ${isActiveTrack ? 'text-primary-foreground' : 'text-text-primary'}`} />
+                              )}
+                            </span>
+                          ) : (
+                            <span className={`text-sm ${isActiveTrack ? 'text-primary' : 'text-text-muted'}`}>{index + 1}</span>
+                          )}
+                        </div>
+
+                        {track.image ? (
+                          <img
+                            src={track.image}
+                            alt={track.name}
+                            className="h-10 w-10 shrink-0 rounded-[12px] object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-bg-secondary">
+                            <Music size={16} className="text-text-muted" />
+                          </div>
+                        )}
+
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-text-primary">{track.name}</p>
+                          {track.artist ? (
+                            <p className="truncate text-xs text-text-secondary">{track.artist}</p>
+                          ) : null}
+                        </div>
+
+                        {track.duration_ms ? (
+                          <span className="text-xs tabular-nums text-text-muted">{formatDuration(track.duration_ms)}</span>
+                        ) : null}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             ) : null}

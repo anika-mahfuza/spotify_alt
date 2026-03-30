@@ -107,6 +107,233 @@ function setCache(key, data) {
   }
 }
 
+function extractSpotifyId(value) {
+  if (!value) return null;
+  const source = String(value);
+  const uriMatch = source.match(/spotify:(?:artist|track):([a-zA-Z0-9]+)/);
+  if (uriMatch) return uriMatch[1];
+  const urlMatch = source.match(/(?:artist|track)\/([a-zA-Z0-9]+)/);
+  if (urlMatch) return urlMatch[1];
+  const rawIdMatch = source.match(/^([a-zA-Z0-9]{22})$/);
+  return rawIdMatch?.[1] || null;
+}
+
+async function fetchSpotifyEmbedState(path) {
+  const res = await fetch(`https://open.spotify.com/embed/${path}`, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml',
+    }
+  });
+
+  if (!res.ok) {
+    throw new Error(`Spotify embed fetch failed: ${res.status}`);
+  }
+
+  const html = await res.text();
+  const match = html.match(/<script\s+id="__NEXT_DATA__"[^>]*>(.*?)<\/script>/s);
+  if (!match) {
+    throw new Error('Could not extract Spotify embed data');
+  }
+
+  const nextData = JSON.parse(match[1]);
+  return nextData?.props?.pageProps?.state?.data || null;
+}
+
+async function resolveArtistId({ artistId, trackId }) {
+  const directArtistId = extractSpotifyId(artistId);
+  if (directArtistId) return directArtistId;
+
+  const normalizedTrackId = extractSpotifyId(trackId);
+  if (!normalizedTrackId) return null;
+
+  const trackData = await fetchSpotifyEmbedState(`track/${normalizedTrackId}`);
+  const entity = trackData?.entity;
+  return extractSpotifyId(entity?.relatedEntityUri) || extractSpotifyId(entity?.artists?.[0]?.uri) || null;
+}
+
+function parseArtistEmbedDetails(entity) {
+  if (!entity || entity.type !== 'artist') return null;
+
+  const artistId = extractSpotifyId(entity.uri) || entity.id;
+  const images = (entity.visualIdentity?.image || []).map(image => ({
+    url: image?.url,
+    width: image?.maxWidth,
+    height: image?.maxHeight,
+  })).filter(image => image.url);
+
+  const topTracks = (entity.trackList || []).slice(0, 5).map(track => ({
+    id: extractSpotifyId(track?.uri) || track?.uid || track?.title || '',
+    name: track?.title || 'Unknown Track',
+    artist: track?.subtitle || undefined,
+    duration_ms: typeof track?.duration === 'number' ? track.duration : undefined,
+    previewUrl: track?.audioPreview?.url || undefined,
+  })).filter(track => track.id && track.name);
+
+  return {
+    id: artistId,
+    name: entity.name || entity.title || 'Unknown Artist',
+    subtitle: entity.subtitle || undefined,
+    images,
+    externalUrl: artistId ? `https://open.spotify.com/artist/${artistId}` : undefined,
+    topTracks,
+  };
+}
+
+function parseTrackEmbedDetails(entity) {
+  if (!entity || entity.type !== 'track') return null;
+
+  const trackId = extractSpotifyId(entity.uri) || entity.id;
+  const artistIds = (entity.artists || []).map(artist => extractSpotifyId(artist?.uri)).filter(Boolean);
+  const images = (entity.visualIdentity?.image || []).map(image => ({
+    url: image?.url,
+    width: image?.maxWidth,
+    height: image?.maxHeight,
+  })).filter(image => image.url);
+
+  return {
+    id: trackId,
+    artist: (entity.artists || []).map(artist => artist?.name).filter(Boolean).join(', ') || undefined,
+    artistId: artistIds[0] || undefined,
+    artistIds,
+    image: images[0]?.url || undefined,
+    duration_ms: typeof entity.duration === 'number' ? entity.duration : undefined,
+    previewUrl: entity.audioPreview?.url || undefined,
+  };
+}
+
+async function enrichArtistTopTrack(track) {
+  const trackId = extractSpotifyId(track?.id);
+  if (!trackId) return track;
+
+  const cacheKey = `spotify_track_embed_${trackId}`;
+  const cached = getCached(cacheKey);
+  if (cached) {
+    return {
+      ...track,
+      ...cached,
+      id: trackId,
+    };
+  }
+
+  try {
+    const trackData = await fetchSpotifyEmbedState(`track/${trackId}`);
+    const details = parseTrackEmbedDetails(trackData?.entity);
+    if (!details) return track;
+
+    const cachedTrack = {
+      artist: details.artist || track.artist,
+      artistId: details.artistId,
+      artistIds: details.artistIds,
+      image: details.image,
+      duration_ms: details.duration_ms || track.duration_ms,
+      previewUrl: details.previewUrl || track.previewUrl,
+    };
+
+    setCache(cacheKey, cachedTrack);
+
+    return {
+      ...track,
+      ...cachedTrack,
+      id: trackId,
+    };
+  } catch {
+    return track;
+  }
+}
+
+function normalizeArtistLookup(value) {
+  return String(value || '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\w\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+async function fetchWikipediaArtistBio(artistName) {
+  const normalizedArtistName = normalizeArtistLookup(artistName);
+  if (!normalizedArtistName) return null;
+
+  const searchTerms = [
+    `"${artistName}" musician`,
+    `"${artistName}" singer`,
+    `"${artistName}" band`,
+    artistName,
+  ];
+
+  const seenTitles = new Set();
+  const candidates = [];
+
+  for (const term of searchTerms) {
+    const searchUrl = new URL('https://en.wikipedia.org/w/api.php');
+    searchUrl.searchParams.set('action', 'query');
+    searchUrl.searchParams.set('list', 'search');
+    searchUrl.searchParams.set('srsearch', term);
+    searchUrl.searchParams.set('srlimit', '5');
+    searchUrl.searchParams.set('format', 'json');
+    searchUrl.searchParams.set('origin', '*');
+
+    try {
+      const res = await fetch(searchUrl, {
+        headers: { 'User-Agent': 'spotify-alt/1.0 (+https://open.spotify.com)' },
+      });
+      if (!res.ok) continue;
+
+      const data = await res.json();
+      for (const result of data?.query?.search || []) {
+        const title = result?.title;
+        if (!title || seenTitles.has(title)) continue;
+        seenTitles.add(title);
+        candidates.push(title);
+      }
+    } catch {
+      continue;
+    }
+
+    if (candidates.length >= 5) break;
+  }
+
+  let bestMatch = null;
+
+  for (const title of candidates) {
+    try {
+      const summaryRes = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`, {
+        headers: { 'User-Agent': 'spotify-alt/1.0 (+https://open.spotify.com)' },
+      });
+      if (!summaryRes.ok) continue;
+
+      const summary = await summaryRes.json();
+      if (summary?.type !== 'standard' || !summary?.extract) continue;
+
+      const normalizedTitle = normalizeArtistLookup(summary.title || title);
+      const description = String(summary.description || '');
+      const descriptionScore = /\b(?:singer|songwriter|rapper|musician|band|producer|dj|composer|violinist|artist)\b/i.test(description) ? 25 : 0;
+      const exactTitleScore = normalizedTitle === normalizedArtistName ? 100 : 0;
+      const containsNameScore = normalizedTitle.includes(normalizedArtistName) || normalizedArtistName.includes(normalizedTitle) ? 40 : 0;
+      const score = exactTitleScore + containsNameScore + descriptionScore;
+
+      if (!bestMatch || score > bestMatch.score) {
+        bestMatch = {
+          score,
+          bio: summary.extract,
+          bioUrl: summary?.content_urls?.desktop?.page || undefined,
+        };
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  if (!bestMatch || bestMatch.score < 40) return null;
+
+  return {
+    bio: bestMatch.bio,
+    bioUrl: bestMatch.bioUrl,
+  };
+}
+
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 
@@ -520,12 +747,17 @@ function parseGraphQLTracks(items) {
     const name = track.name || 'Unknown Track';
     const uri = track.uri || '';
     const durationMs = track.trackDuration?.totalMilliseconds || 0;
-    const artists = (track.artists?.items || [])
-      .map(a => a?.profile?.name)
+    const artistItems = (track.artists?.items || []).map(artist => ({
+      name: artist?.profile?.name || null,
+      id: extractSpotifyId(artist?.uri),
+    })).filter(artist => artist.name);
+    const artists = artistItems
+      .map(artist => artist.name)
       .filter(Boolean)
       .join(', ') || 'Unknown Artist';
     const album = track.albumOfTrack?.name || '';
     const image = track.albumOfTrack?.coverArt?.sources?.[0]?.url || '';
+    const spotifyTrackId = extractSpotifyId(uri);
 
     return {
       name,
@@ -533,7 +765,10 @@ function parseGraphQLTracks(items) {
       album,
       image,
       duration: msToTime(durationMs),
-      url: uri ? `https://open.spotify.com/track/${uri.split(':').pop()}` : '#'
+      url: spotifyTrackId ? `https://open.spotify.com/track/${spotifyTrackId}` : '#',
+      artistId: artistItems[0]?.id || undefined,
+      artistIds: artistItems.map(artist => artist.id).filter(Boolean),
+      spotifyTrackId: spotifyTrackId || undefined,
     };
   }).filter(Boolean);
 }
@@ -621,7 +856,56 @@ app.get('/api/import-playlist', async (req, res) => {
 //  YOUTUBE SEARCH & STREAMING ENDPOINTS
 // ═══════════════════════════════════════════════════════════════════════════════
 
-app.get('/api/search', async (req, res) => {
+app.get('/api/artist-details', async (req, res) => {
+  const { artistId, trackId } = req.query;
+  if (!artistId && !trackId) {
+    return res.status(400).json({ error: 'artistId or trackId is required' });
+  }
+
+  try {
+    const cacheKey = `artist_details_${String(artistId || '')}_${String(trackId || '')}`;
+    const cached = getCached(cacheKey);
+    if (cached) return res.json(cached);
+
+    const resolvedArtistId = await resolveArtistId({ artistId, trackId });
+    if (!resolvedArtistId) {
+      return res.status(404).json({ error: 'Artist could not be resolved' });
+    }
+
+    const artistData = await fetchSpotifyEmbedState(`artist/${resolvedArtistId}`);
+    const artistDetails = parseArtistEmbedDetails(artistData?.entity);
+    if (!artistDetails) {
+      return res.status(404).json({ error: 'Artist details unavailable' });
+    }
+
+    let enrichedArtistDetails = artistDetails;
+
+    if (artistDetails.topTracks?.length) {
+      const topTracks = await Promise.all(artistDetails.topTracks.map(enrichArtistTopTrack));
+      enrichedArtistDetails = {
+        ...enrichedArtistDetails,
+        topTracks,
+      };
+    }
+
+    const wikipediaBio = await fetchWikipediaArtistBio(enrichedArtistDetails.name).catch(() => null);
+    if (wikipediaBio) {
+      enrichedArtistDetails = {
+        ...enrichedArtistDetails,
+        bio: wikipediaBio.bio,
+        bioUrl: wikipediaBio.bioUrl,
+      };
+    }
+
+    setCache(cacheKey, enrichedArtistDetails);
+    res.json(enrichedArtistDetails);
+  } catch (e) {
+    console.error('Artist details error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+  app.get('/api/search', async (req, res) => {
   const { q, title, artist } = req.query;
   if (!q) return res.status(400).json({ error: 'Query required' });
   try {

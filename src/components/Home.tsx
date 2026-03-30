@@ -13,7 +13,16 @@ function parseDurationToMs(dur: string): number {
   return 0;
 }
 
+function extractSpotifyTrackId(url?: string): string | undefined {
+  if (!url) return undefined;
+  const match = url.match(/track\/([a-zA-Z0-9]+)/);
+  return match?.[1];
+}
+
 function importedTrackToTrack(t: ImportedTrack, index: number): Track {
+  const artistIds = t.artistIds?.filter(Boolean);
+  const spotifyTrackId = t.spotifyTrackId || extractSpotifyTrackId(t.url);
+
   return {
     id: `imported-${index}-${t.name.replace(/\s+/g, '-')}`.slice(0, 50),
     name: t.name,
@@ -21,11 +30,25 @@ function importedTrackToTrack(t: ImportedTrack, index: number): Track {
     album: t.album,
     duration_ms: parseDurationToMs(t.duration),
     image: t.image || undefined,
+    artistId: t.artistId || artistIds?.[0],
+    artistIds,
+    spotifyTrackId,
+    spotifyUrl: t.url || undefined,
   };
 }
 
 function importedPlaylistToTracks(playlist: ImportedPlaylist): Track[] {
   return playlist.tracks.map((track, index) => importedTrackToTrack(track, index));
+}
+
+function isSameTrack(left?: Track | null, right?: Track | null): boolean {
+  if (!left || !right) return false;
+
+  if (left.spotifyTrackId && right.spotifyTrackId) {
+    return left.spotifyTrackId === right.spotifyTrackId;
+  }
+
+  return left.id === right.id;
 }
 
 interface HomeProps {
@@ -34,12 +57,11 @@ interface HomeProps {
   currentTrack?: Track | null;
   isPlaying?: boolean;
   setIsPlaying?: Dispatch<SetStateAction<boolean>>;
-  playingContextId?: string | null;
 }
 
 const SONGS_PER_PAGE = 50;
 
-export function Home({ activePlaylistId, onTrackSelect, currentTrack, isPlaying, setIsPlaying, playingContextId }: HomeProps) {
+export function Home({ activePlaylistId, onTrackSelect, currentTrack, isPlaying, setIsPlaying }: HomeProps) {
   const navigate = useNavigate();
   const [allTracks, setAllTracks] = useState<Track[]>([]);
   const [displayedTracks, setDisplayedTracks] = useState<Track[]>([]);
@@ -191,7 +213,7 @@ export function Home({ activePlaylistId, onTrackSelect, currentTrack, isPlaying,
       return;
     }
 
-    if (currentTrack?.id === track.id) {
+    if (isSameTrack(currentTrack, track)) {
       setIsPlaying(prev => !prev);
       return;
     }
@@ -203,7 +225,7 @@ export function Home({ activePlaylistId, onTrackSelect, currentTrack, isPlaying,
   const playPlaylist = () => {
     if (!allTracks.length) return;
 
-    if (playingContextId === activePlaylistId) {
+    if (currentTrack && allTracks.some(track => isSameTrack(track, currentTrack))) {
       setIsPlaying?.(!isPlaying);
       return;
     }
@@ -277,7 +299,7 @@ export function Home({ activePlaylistId, onTrackSelect, currentTrack, isPlaying,
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
                   {allPlaylists.map(item => {
                     const itemTracks = importedPlaylistToTracks(item);
-                    const isPlaylistActive = playingContextId === item.id && !!currentTrack && itemTracks.some(track => track.id === currentTrack.id);
+                    const isPlaylistActive = !!currentTrack && itemTracks.some(track => isSameTrack(track, currentTrack));
 
                     return (
                     <div
@@ -375,94 +397,96 @@ export function Home({ activePlaylistId, onTrackSelect, currentTrack, isPlaying,
               <div className="absolute inset-0" style={{ background: 'var(--hero-gradient)' }} />
               <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent" />
 
-              <div className="relative z-10 flex flex-col gap-5 px-5 py-6 md:flex-row md:items-end md:px-7 md:py-8">
-                <div className="h-32 w-32 shrink-0 overflow-hidden rounded-[16px] shadow-elevated md:h-44 md:w-44">
-                  {playlist?.image ? (
-                    <img src={playlist.image} alt={playlist.name} className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-bg-secondary">
-                      <Disc size={56} className="text-text-muted" />
+              <div className="relative z-10 px-4 py-4 md:px-7 md:py-7">
+                <div className="flex flex-col gap-4 md:flex-row md:items-end md:gap-5">
+                  <div className="h-28 w-28 shrink-0 overflow-hidden rounded-[16px] shadow-elevated md:h-40 md:w-40">
+                    {playlist?.image ? (
+                      <img src={playlist.image} alt={playlist.name} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center bg-bg-secondary">
+                        <Disc size={56} className="text-text-muted" />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <span className="app-badge inline-flex rounded-lg px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-text-secondary">
+                      Playlist
+                    </span>
+                    <h1 className="mt-2.5 text-[2.1rem] font-bold leading-tight text-text-primary md:mt-3 md:text-[2.5rem]">
+                      {playlist?.name || 'Playlist'}
+                    </h1>
+                    {playlist?.description ? (
+                      <p className="mt-2.5 max-w-2xl text-sm leading-6 text-text-secondary line-clamp-2">
+                        {playlist.description}
+                      </p>
+                    ) : null}
+                    <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-text-secondary">
+                      <span className="font-medium text-text-primary">{allTracks.length} songs</span>
+                      {playlist?.owner ? <span>by {playlist.owner}</span> : null}
                     </div>
-                  )}
-                </div>
-
-                <div className="min-w-0">
-                  <span className="app-badge inline-flex rounded-lg px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-text-secondary">
-                    Playlist
-                  </span>
-                  <h1 className="mt-3 text-3xl font-bold leading-tight text-text-primary md:text-[2.8rem]">
-                    {playlist?.name || 'Playlist'}
-                  </h1>
-                  {playlist?.description ? (
-                    <p className="mt-3 max-w-2xl text-sm leading-6 text-text-secondary line-clamp-2">
-                      {playlist.description}
-                    </p>
-                  ) : null}
-                  <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-text-secondary">
-                    <span className="font-medium text-text-primary">{allTracks.length} songs</span>
-                    {playlist?.owner ? <span>by {playlist.owner}</span> : null}
                   </div>
                 </div>
-              </div>
-            </div>
 
-            <div className="mt-4 flex flex-col gap-3 rounded-[18px] app-panel px-3 py-3 md:flex-row md:items-center md:px-4">
-              <button
-                type="button"
-                className={`flex h-11 w-11 items-center justify-center rounded-full shadow-glow transition-transform hover:scale-[1.03] ${isPlaying && currentTrack && allTracks.some(track => track.id === currentTrack.id) ? 'app-button-primary' : 'app-button-secondary'}`}
-                onClick={playPlaylist}
-              >
-                {isPlaying && currentTrack && allTracks.some(track => track.id === currentTrack.id) ? (
-                  <SolidPauseIcon className="h-5 w-5 text-primary-foreground" />
-                ) : (
-                  <SolidPlayIcon className="h-5 w-5 text-text-primary" />
-                )}
-              </button>
+                <div className="mt-4 flex items-center gap-2.5 md:mt-5 md:justify-between md:gap-3">
+                  <button
+                    type="button"
+                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full shadow-glow transition-transform hover:scale-[1.03] ${isPlaying && currentTrack && allTracks.some(track => track.id === currentTrack.id) ? 'app-button-primary' : 'app-button-secondary'}`}
+                    onClick={playPlaylist}
+                  >
+                    {isPlaying && currentTrack && allTracks.some(track => track.id === currentTrack.id) ? (
+                      <SolidPauseIcon className="h-5 w-5 text-primary-foreground" />
+                    ) : (
+                      <SolidPlayIcon className="h-5 w-5 text-text-primary" />
+                    )}
+                  </button>
 
-              <div className="flex items-center gap-4 md:ml-auto">
-                <div
-                  className={`app-input-shell flex items-center overflow-hidden rounded-full transition-all duration-200 ${isSearchExpanded ? 'w-full md:w-64' : 'w-10 cursor-pointer'}`}
-                  onClick={() => {
-                    if (!isSearchExpanded) {
-                      setIsSearchExpanded(true);
-                      setTimeout(() => searchInputRef.current?.focus(), 100);
-                    }
-                  }}
-                >
-                  <div className="flex h-10 w-10 items-center justify-center shrink-0">
-                    <SearchIcon size={16} className={isSearchExpanded ? 'text-text-secondary' : 'text-text-primary'} />
-                  </div>
-                  <div className={`flex-1 overflow-hidden transition-all duration-200 ${isSearchExpanded ? 'opacity-100' : 'w-0 opacity-0'}`}>
-                    <input
-                      ref={searchInputRef}
-                      type="text"
-                      value={playlistSearchQuery}
-                      onChange={(event) => setPlaylistSearchQuery(event.target.value)}
-                      onBlur={() => {
-                        if (!playlistSearchQuery) setIsSearchExpanded(false);
+                    <div className="flex min-w-0 flex-1 items-center gap-2.5 md:max-w-[320px] md:flex-none">
+                    <div
+                      className={`app-input-shell flex min-w-0 items-center overflow-hidden rounded-full transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${isSearchExpanded ? 'flex-1 w-full' : 'w-10 shrink-0 cursor-pointer'}`}
+                      onClick={() => {
+                        if (!isSearchExpanded) {
+                          setIsSearchExpanded(true);
+                          setTimeout(() => searchInputRef.current?.focus(), 100);
+                        }
                       }}
-                      placeholder="Search in playlist"
-                      className="w-full bg-transparent py-2 pr-2 text-sm text-text-primary placeholder:text-text-muted outline-none"
-                    />
-                  </div>
-                  {isSearchExpanded && playlistSearchQuery ? (
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setPlaylistSearchQuery('');
-                        searchInputRef.current?.focus();
-                      }}
-                      className="mr-2 flex h-7 w-7 items-center justify-center rounded-full text-text-muted hover:text-text-primary"
                     >
-                      <X size={14} />
-                    </button>
-                  ) : null}
-                </div>
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center">
+                        <SearchIcon size={16} className={isSearchExpanded ? 'text-text-secondary' : 'text-text-primary'} />
+                      </div>
+                      <div className={`flex-1 overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${isSearchExpanded ? 'opacity-100' : 'w-0 opacity-0'}`}>
+                        <input
+                          ref={searchInputRef}
+                          type="text"
+                          value={playlistSearchQuery}
+                          onChange={(event) => setPlaylistSearchQuery(event.target.value)}
+                          onBlur={() => {
+                            if (!playlistSearchQuery) setIsSearchExpanded(false);
+                          }}
+                          placeholder="Search in playlist"
+                          className="w-full bg-transparent py-2 pr-2 text-sm text-text-primary placeholder:text-text-muted outline-none"
+                        />
+                      </div>
+                      {isSearchExpanded && playlistSearchQuery ? (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setPlaylistSearchQuery('');
+                            searchInputRef.current?.focus();
+                          }}
+                          className="mr-2 flex h-7 w-7 items-center justify-center rounded-full text-text-muted hover:text-text-primary"
+                        >
+                          <X size={14} />
+                        </button>
+                      ) : null}
+                    </div>
 
-                {playlistSearchQuery ? (
-                  <span className="app-badge rounded-lg px-2.5 py-0.5 text-[11px]">{filteredTracks.length} results</span>
-                ) : null}
+                    {playlistSearchQuery ? (
+                      <span className="app-badge shrink-0 rounded-lg px-2.5 py-0.5 text-[11px]">{filteredTracks.length} results</span>
+                    ) : null}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -480,7 +504,7 @@ export function Home({ activePlaylistId, onTrackSelect, currentTrack, isPlaying,
 
                   <div className="mt-2 flex flex-col gap-1.5">
                     {displayedTracks.map((track, index) => {
-                      const isActive = currentTrack?.id === track.id;
+                      const isActive = isSameTrack(currentTrack, track);
 
                       return (
                         <div

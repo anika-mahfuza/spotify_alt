@@ -9,6 +9,10 @@ export interface Track {
   isYoutube?: boolean;
   youtubeId?: string;
   youtubeCandidates?: string[];
+  artistId?: string;
+  artistIds?: string[];
+  spotifyTrackId?: string;
+  spotifyUrl?: string;
   playbackNonce?: number;
 }
 
@@ -19,6 +23,9 @@ export interface ImportedTrack {
   image: string;
   duration: string;
   url: string;
+  artistId?: string;
+  artistIds?: string[];
+  spotifyTrackId?: string;
 }
 
 export interface ImportedPlaylist {
@@ -51,6 +58,20 @@ export interface Artist {
   genres?: string[];
   followers?: { total: number };
   popularity?: number;
+  subtitle?: string;
+  externalUrl?: string;
+  bio?: string;
+  bioUrl?: string;
+  topTracks?: Array<{
+    id: string;
+    name: string;
+    artist?: string;
+    artistId?: string;
+    artistIds?: string[];
+    duration_ms?: number;
+    previewUrl?: string;
+    image?: string;
+  }>;
 }
 
 export interface SimplifiedArtist {
