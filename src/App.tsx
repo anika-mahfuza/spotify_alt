@@ -117,6 +117,7 @@ interface MainContentProps {
   setCurrentTrack: Dispatch<SetStateAction<Track | null>>;
   isPlaying: boolean;
   setIsPlaying: Dispatch<SetStateAction<boolean>>;
+  isMobileMenuOpen: boolean;
   isNowPlayingSidebarOpen: boolean;
   setIsNowPlayingSidebarOpen: (isOpen: boolean) => void;
   sidebarWidth: number;
@@ -132,6 +133,7 @@ function MainContent({
   setCurrentTrack,
   isPlaying,
   setIsPlaying,
+  isMobileMenuOpen,
   isNowPlayingSidebarOpen,
   setIsNowPlayingSidebarOpen,
   sidebarWidth,
@@ -397,6 +399,7 @@ function MainContent({
           isLoading={isSearchLoading}
           showHomeButton={!!activePlaylistId}
           onToggleMenu={onToggleMenu}
+          isMenuOpen={isMobileMenuOpen}
         />
       </div>
 
@@ -520,6 +523,8 @@ function MainLayout() {
   const artistDetailsLookupKey = currentTrack
     ? `${currentTrack.artistId || ''}__${currentTrack.spotifyTrackId || ''}__${currentTrack.id || ''}`
     : '';
+  const openMobileMenu = useCallback(() => setIsMobileMenuOpen(true), []);
+  const closeMobileMenu = useCallback(() => setIsMobileMenuOpen(false), []);
 
   // Extract colors from current track
   useEffect(() => {
@@ -676,12 +681,13 @@ function MainLayout() {
   return (
     <div className="flex h-screen w-screen text-text-primary overflow-hidden relative bg-bg-base">
       <DynamicBackground currentTrack={currentTrack} />
-      <Sidebar isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
+      <Sidebar isOpen={isMobileMenuOpen} onClose={closeMobileMenu} />
       <MainContent
         currentTrack={currentTrack}
         setCurrentTrack={setCurrentTrack}
         isPlaying={isPlaying}
         setIsPlaying={setIsPlaying}
+        isMobileMenuOpen={isMobileMenuOpen}
         isNowPlayingSidebarOpen={isNowPlayingSidebarOpen}
         setIsNowPlayingSidebarOpen={setIsNowPlayingSidebarOpen}
         sidebarWidth={sidebarWidth}
@@ -689,7 +695,7 @@ function MainLayout() {
         setQueue={setQueue}
         currentIndex={currentIndex}
         setCurrentIndex={setCurrentIndex}
-        onToggleMenu={() => setIsMobileMenuOpen(true)}
+        onToggleMenu={openMobileMenu}
       />
       {isNowPlayingSidebarOpen && (
         <NowPlayingSidebar

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Music, Plus, Trash2, X } from 'lucide-react';
 import { ImportedPlaylist } from '../types';
@@ -24,9 +24,13 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const [confirmDelete, setConfirmDelete] = useState<ImportedPlaylist | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
+  const previousPathRef = useRef(location.pathname);
 
   useEffect(() => {
-    onClose?.();
+    if (location.pathname !== previousPathRef.current) {
+      previousPathRef.current = location.pathname;
+      onClose?.();
+    }
   }, [location.pathname, onClose]);
 
   useEffect(() => {
@@ -119,11 +123,11 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       ) : null}
 
       {isOpen ? (
-        <div className="fixed inset-0 z-[190] bg-black/55 md:hidden" onClick={onClose} />
+        <div className="fixed inset-0 z-[250] bg-black/55 md:hidden" onClick={onClose} />
       ) : null}
 
       <div
-        className={`fixed inset-y-0 left-0 z-[200] flex w-72 flex-col border-r border-border/60 bg-bg-primary/46 shadow-[0_20px_50px_rgba(0,0,0,0.18)] backdrop-blur-3xl transition-transform duration-300 md:static md:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        className={`fixed inset-y-0 left-0 z-[260] flex w-72 flex-col border-r border-border/60 bg-bg-primary/46 shadow-[0_20px_50px_rgba(0,0,0,0.18)] backdrop-blur-3xl transition-transform duration-300 md:static md:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
         style={{ height: 'calc(100vh - 6rem)' }}
       >
         <div className="flex items-center justify-between px-4 pb-3 pt-4">

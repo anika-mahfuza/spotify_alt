@@ -9,9 +9,10 @@ interface SearchBarProps {
   onChange?: (value: string) => void;
   showHomeButton?: boolean;
   onToggleMenu?: () => void;
+  isMenuOpen?: boolean;
 }
 
-export const SearchBar = ({ onSearch, isLoading, value, onChange, showHomeButton, onToggleMenu }: SearchBarProps) => {
+export const SearchBar = ({ onSearch, isLoading, value, onChange, showHomeButton, onToggleMenu, isMenuOpen = false }: SearchBarProps) => {
   const [internalQuery, setInternalQuery] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -55,8 +56,10 @@ export const SearchBar = ({ onSearch, isLoading, value, onChange, showHomeButton
         {onToggleMenu ? (
           <button
             onClick={onToggleMenu}
-            className="app-icon-button flex h-11 w-11 items-center justify-center rounded-full md:hidden"
+            className={`app-icon-button flex h-11 w-11 items-center justify-center rounded-full transition-opacity md:hidden ${isMenuOpen ? 'pointer-events-none opacity-0' : 'opacity-100'}`}
             title="Menu"
+            aria-hidden={isMenuOpen}
+            tabIndex={isMenuOpen ? -1 : 0}
           >
             <Menu size={20} className="text-text-primary" />
           </button>
