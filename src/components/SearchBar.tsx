@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react';
-import { Search, X, Home, Menu } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Home, Menu, Search, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface SearchBarProps {
@@ -20,14 +20,14 @@ export const SearchBar = ({ onSearch, isLoading, value, onChange, showHomeButton
 
   const query = value !== undefined ? value : internalQuery;
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value;
-    setInternalQuery(newValue);
-    onChange?.(newValue);
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const nextValue = event.target.value;
+    setInternalQuery(nextValue);
+    onChange?.(nextValue);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
     if (query.trim()) {
       onSearch(query);
     }
@@ -44,44 +44,44 @@ export const SearchBar = ({ onSearch, isLoading, value, onChange, showHomeButton
     inputRef.current?.focus();
   };
 
-  const handleBlur = (e: React.FocusEvent) => {
-    if (containerRef.current?.contains(e.relatedTarget as Node)) return;
+  const handleBlur = (event: React.FocusEvent) => {
+    if (containerRef.current?.contains(event.relatedTarget as Node)) return;
     if (!query.trim()) setIsExpanded(false);
   };
 
   return (
-    <div className="flex items-center justify-between w-full" ref={containerRef}>
+    <div className="flex w-full items-center justify-between" ref={containerRef}>
       <div className="flex items-center gap-3">
-        {onToggleMenu && (
+        {onToggleMenu ? (
           <button
             onClick={onToggleMenu}
-            className="md:hidden w-10 h-10 bg-white/10 hover:bg-white/15 backdrop-blur-md rounded-full flex items-center justify-center transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] border border-white/10 hover:border-white/20"
+            className="app-icon-button flex h-11 w-11 items-center justify-center rounded-full md:hidden"
             title="Menu"
           >
-            <Menu size={20} className="text-white" />
+            <Menu size={20} className="text-text-primary" />
           </button>
-        )}
+        ) : null}
 
-        {showHomeButton && (
+        {showHomeButton ? (
           <button
             onClick={() => navigate('/')}
-            className="w-10 h-10 bg-white/10 hover:bg-white/15 backdrop-blur-md rounded-full flex items-center justify-center transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] border border-white/10 hover:border-white/20"
+            className="app-icon-button hidden h-11 w-11 items-center justify-center rounded-full sm:flex"
             title="Home"
           >
-            <Home size={20} className="text-white" />
+            <Home size={20} className="text-text-primary" />
           </button>
-        )}
+        ) : null}
 
         <form onSubmit={handleSubmit} className="relative">
           <div
-            className={`flex items-center rounded-full overflow-hidden transition-all duration-200 ease-out backdrop-blur-md ${isExpanded ? 'w-80 bg-white/10 border border-white/20' : 'w-10 h-10 bg-white/10 hover:bg-white/15 cursor-pointer border border-white/10 hover:border-white/20'}`}
+            className={`app-input-shell flex items-center overflow-hidden rounded-full transition-all duration-200 ease-out ${isExpanded ? 'w-[min(28rem,70vw)]' : 'h-11 w-11 cursor-pointer'}`}
             onClick={!isExpanded ? handleExpand : undefined}
           >
-            <div className={`flex items-center justify-center flex-shrink-0 ${isExpanded ? 'pl-4' : 'w-10 h-10'}`}>
-              <Search size={18} className={`transition-all ${isExpanded ? 'text-text-muted' : 'text-white'}`} />
+            <div className={`flex items-center justify-center shrink-0 ${isExpanded ? 'pl-4' : 'h-11 w-11'}`}>
+              <Search size={18} className={isExpanded ? 'text-text-secondary' : 'text-text-primary'} />
             </div>
 
-            <div className={`flex-1 overflow-hidden transition-all duration-200 ${isExpanded ? 'opacity-100' : 'opacity-0 w-0'}`}>
+            <div className={`flex-1 overflow-hidden transition-all duration-200 ${isExpanded ? 'opacity-100' : 'w-0 opacity-0'}`}>
               <input
                 ref={inputRef}
                 type="text"
@@ -90,21 +90,25 @@ export const SearchBar = ({ onSearch, isLoading, value, onChange, showHomeButton
                 onBlur={handleBlur}
                 placeholder="Search songs, artists, or albums..."
                 disabled={isLoading}
-                className="w-full py-2.5 pr-4 pl-3 bg-transparent text-white text-[14px] placeholder:text-text-muted outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full bg-transparent py-2.5 pl-3 pr-4 text-[14px] text-text-primary placeholder:text-text-muted outline-none disabled:cursor-not-allowed disabled:opacity-50"
               />
             </div>
 
-            {isExpanded && isLoading && (
+            {isExpanded && isLoading ? (
               <div className="mr-4">
-                <div className="w-4 h-4 border-2 border-text-muted border-t-white rounded-full animate-spin" />
+                <div className="h-4 w-4 rounded-full border-2 border-text-muted border-t-primary animate-spin" />
               </div>
-            )}
+            ) : null}
 
-            {isExpanded && query && !isLoading && (
-              <button type="button" onClick={handleClear} className="p-1.5 mr-2 rounded-full hover:bg-white/10 transition-colors group">
-                <X size={14} className="text-text-muted group-hover:text-white" />
+            {isExpanded && query && !isLoading ? (
+              <button
+                type="button"
+                onClick={handleClear}
+                className="mr-2 flex h-8 w-8 items-center justify-center rounded-full text-text-muted hover:text-text-primary"
+              >
+                <X size={14} />
               </button>
-            )}
+            ) : null}
           </div>
         </form>
       </div>

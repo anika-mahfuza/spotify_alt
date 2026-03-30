@@ -1,169 +1,140 @@
-import { Play, Pause, Music2, Clock } from 'lucide-react';
 import { useState } from 'react';
+import { Clock, Music2 } from 'lucide-react';
 import { Track } from '../types';
+import { SolidPauseIcon, SolidPlayIcon } from './PlaybackIcons';
 
 interface Video {
-    id: string;
-    title: string;
-    duration?: number;
-    thumbnail?: string;
-    uploader?: string;
+  id: string;
+  title: string;
+  duration?: number;
+  thumbnail?: string;
+  uploader?: string;
 }
 
 interface ResultListProps {
-    results: Video[];
-    onSelect: (video: Video) => void;
-    currentTrack?: Track | null;
-    isPlaying?: boolean;
+  results: Video[];
+  onSelect: (video: Video) => void;
+  currentTrack?: Track | null;
+  isPlaying?: boolean;
 }
 
 export const ResultList = ({ results, onSelect, currentTrack, isPlaying = false }: ResultListProps) => {
-    if (results.length === 0) {
-        return (
-            <div className="flex flex-col items-center justify-center py-20">
-                <div className="w-20 h-20 mb-6 rounded-full bg-white/5 backdrop-blur-md flex items-center justify-center border border-white/10">
-                    <Music2 size={36} className="text-text-muted" />
-                </div>
-                <h3 className="text-xl font-bold text-white mb-2">No results found</h3>
-                <p className="text-text-muted text-sm">Try searching with different keywords</p>
-            </div>
-        );
-    }
-
-    const formatDuration = (seconds: number) => {
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
-    };
-
+  if (results.length === 0) {
     return (
-        <div className="space-y-2 animate-fadeIn">
-            {results.map((video) => (
-                <VideoItem
-                    key={video.id}
-                    video={video}
-                    onSelect={onSelect}
-                    formatDuration={formatDuration}
-                    isActive={currentTrack?.id === video.id}
-                    isPlaying={isPlaying}
-                />
-            ))}
+      <div className="flex flex-col items-center justify-center py-20">
+        <div className="app-card mb-6 flex h-16 w-16 items-center justify-center rounded-full">
+          <Music2 size={36} className="text-text-muted" />
         </div>
+        <h3 className="text-xl font-bold text-text-primary">No results found</h3>
+        <p className="mt-2 text-sm text-text-muted">Try searching with different keywords</p>
+      </div>
     );
+  }
+
+  const formatDuration = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainder = seconds % 60;
+    return `${minutes}:${remainder.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <div className="space-y-2.5 animate-fadeIn">
+      {results.map(video => (
+        <VideoItem
+          key={video.id}
+          video={video}
+          onSelect={onSelect}
+          formatDuration={formatDuration}
+          isActive={currentTrack?.id === video.id}
+          isPlaying={isPlaying}
+        />
+      ))}
+    </div>
+  );
 };
 
-function VideoItem({ video, onSelect, formatDuration, isActive = false, isPlaying = false }: {
-    video: Video;
-    onSelect: (video: Video) => void;
-    formatDuration: (seconds: number) => string;
-    isActive?: boolean;
-    isPlaying?: boolean;
+function VideoItem({
+  video,
+  onSelect,
+  formatDuration,
+  isActive = false,
+  isPlaying = false,
+}: {
+  video: Video;
+  onSelect: (video: Video) => void;
+  formatDuration: (seconds: number) => string;
+  isActive?: boolean;
+  isPlaying?: boolean;
 }) {
-    const [imageError, setImageError] = useState(false);
-    const [isHovered, setIsHovered] = useState(false);
-    const thumbnailUrl = video.thumbnail || '';
+  const [imageError, setImageError] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const thumbnailUrl = video.thumbnail || '';
 
-    const getThumbnailUrl = (url: string) => {
-        if (!url) return '';
-        if (url.includes('youtube.com/vi/')) {
-            return url.replace('/maxresdefault.jpg', '/hqdefault.jpg');
-        }
-        return url;
-    };
+  const getThumbnailUrl = (url: string) => {
+    if (!url) return '';
+    if (url.includes('youtube.com/vi/')) {
+      return url.replace('/maxresdefault.jpg', '/hqdefault.jpg');
+    }
+    return url;
+  };
 
-    return (
-        <div
-            onClick={() => onSelect(video)}
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
-            className={`
-                flex items-center gap-4 p-3 rounded-lg
-                backdrop-blur-md
-                cursor-pointer transition-all duration-200
-                group border shadow-lg hover:shadow-xl
-                ${isActive
-                    ? 'bg-black/20 border-white/20'
-                    : 'bg-white/5 hover:bg-white/10 border-white/5 hover:border-white/10'}
-            `}
-        >
-            {/* Thumbnail Container */}
-            <div className="relative flex-shrink-0 w-28 h-28 sm:w-32 sm:h-32 rounded-lg overflow-hidden bg-white/5 backdrop-blur-sm shadow-card border border-white/10">
-                {!imageError && thumbnailUrl ? (
-                    <>
-                        <img
-                            src={getThumbnailUrl(thumbnailUrl)}
-                            alt={video.title}
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                            loading="lazy"
-                            onError={() => setImageError(true)}
-                        />
+  return (
+    <div
+      onClick={() => onSelect(video)}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      className={`group flex cursor-pointer items-center gap-2.5 rounded-[14px] p-2.5 ${isActive ? 'app-card app-card-active' : 'app-card app-card-hover'}`}
+    >
+      <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-[10px] bg-bg-secondary shadow-card sm:h-24 sm:w-24 sm:rounded-[12px]">
+        {!imageError && thumbnailUrl ? (
+          <>
+            <img
+              src={getThumbnailUrl(thumbnailUrl)}
+              alt={video.title}
+              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
+              loading="lazy"
+              onError={() => setImageError(true)}
+            />
 
-                        {/* Play button overlay */}
-                        <div className={`
-                            absolute inset-0 bg-black/60
-                            flex items-center justify-center
-                            transition-opacity duration-200
-                            ${(isHovered && window.matchMedia('(hover: hover)').matches) || isActive ? 'opacity-100' : 'opacity-0'}
-                        `}>
-                            <div className={`
-                                w-14 h-14 rounded-full
-                                flex items-center justify-center
-                                transform transition-all duration-200
-                                ${window.matchMedia('(hover: hover)').matches ? 'hover:scale-110' : 'active:scale-95'}
-                    ${isActive ? 'bg-primary' : 'bg-white/60'}
-                            `}>
-                                {isActive && isPlaying ? (
-                                    <Pause size={24} fill="white" className="text-white" />
-                                ) : (
-                                    <Play size={24} fill="white" className="text-white ml-1" />
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Duration badge */}
-                        {video.duration && video.duration > 0 && (
-                            <div className="
-                                absolute bottom-2 right-2
-                                bg-black/80 backdrop-blur-sm
-                                text-white text-xs font-semibold
-                                px-2 py-1 rounded
-                                flex items-center gap-1
-                            ">
-                                <Clock size={12} />
-                                {formatDuration(video.duration)}
-                            </div>
-                        )}
-                    </>
+            <div className={`absolute inset-0 flex items-center justify-center bg-black/45 transition-opacity duration-200 ${isHovered || isActive ? 'opacity-100' : 'opacity-0'}`}>
+              <div className={`flex h-10 w-10 items-center justify-center rounded-full ${isActive ? 'app-button-primary' : 'app-button-secondary'}`}>
+                {isActive && isPlaying ? (
+                  <SolidPauseIcon className={isActive ? 'h-[18px] w-[18px] text-primary-foreground' : 'h-[18px] w-[18px] text-text-primary'} />
                 ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-white/10 backdrop-blur-md">
-                        <Music2 size={40} className="text-text-muted" />
-                    </div>
+                  <SolidPlayIcon className={isActive ? 'h-[18px] w-[18px] text-primary-foreground' : 'h-[18px] w-[18px] text-text-primary'} />
                 )}
+              </div>
             </div>
 
-            {/* Video Info */}
-            <div className="flex-1 min-w-0 pr-4">
-                <h3
-                    className={`
-                        font-semibold text-base sm:text-lg mb-2
-                        line-clamp-2 leading-snug transition-colors
-                        ${isActive ? 'text-primary' : 'text-white group-hover:text-primary'}
-                    `}
-                    dangerouslySetInnerHTML={{ __html: video.title }}
-                />
+            {video.duration && video.duration > 0 ? (
+              <div className="absolute bottom-1.5 right-1.5 flex items-center gap-1 rounded-lg bg-black/70 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
+                <Clock size={11} />
+                {formatDuration(video.duration)}
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-bg-secondary">
+            <Music2 size={30} className="text-text-muted" />
+          </div>
+        )}
+      </div>
 
-                {video.uploader && (
-                    <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-white/5 backdrop-blur-sm flex items-center justify-center border border-white/10">
-                            <Music2 size={14} className="text-text-muted" />
-                        </div>
-                        <p className={`text-sm truncate hover:text-white transition-colors ${isActive ? 'text-white/90' : 'text-text-secondary'}`}>
-                            {video.uploader}
-                        </p>
-                    </div>
-                )}
+      <div className="min-w-0 flex-1 pr-1">
+        <h3
+          className={`line-clamp-2 text-[14px] font-semibold leading-snug sm:text-[15px] ${isActive ? 'text-primary' : 'text-text-primary'}`}
+          dangerouslySetInnerHTML={{ __html: video.title }}
+        />
+
+        {video.uploader ? (
+          <div className="mt-2 flex items-center gap-2">
+            <div className="flex h-5 w-5 items-center justify-center rounded-full app-card">
+              <Music2 size={12} className="text-text-muted" />
             </div>
-
-        </div>
-    );
+            <p className={`truncate text-[12px] ${isActive ? 'text-text-primary' : 'text-text-secondary'}`}>{video.uploader}</p>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
 }

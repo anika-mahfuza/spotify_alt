@@ -1,11 +1,16 @@
-import { useState, useRef, useEffect } from 'react';
-import { X, Link, Loader2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Link, Loader2, X } from 'lucide-react';
 import { config } from '../config';
 import { ImportedPlaylist, ImportedTrack } from '../types';
 
 interface ImportPlaylistProps {
   onClose: () => void;
   onImported: (playlist: ImportedPlaylist) => void;
+}
+
+function extractSpotifyPlaylistId(url: string): string | null {
+  const match = url.match(/playlist\/([a-zA-Z0-9]+)/);
+  return match?.[1] || null;
 }
 
 export function ImportPlaylist({ onClose, onImported }: ImportPlaylistProps) {
@@ -19,10 +24,17 @@ export function ImportPlaylist({ onClose, onImported }: ImportPlaylistProps) {
     inputRef.current?.focus();
   }, []);
 
-  const handleImport = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleImport = (event: React.FormEvent) => {
+    event.preventDefault();
+
     const trimmed = url.trim();
     if (!trimmed.includes('spotify.com/playlist/')) {
+      setError('Please enter a valid Spotify playlist URL');
+      return;
+    }
+
+    const spotifyPlaylistId = extractSpotifyPlaylistId(trimmed);
+    if (!spotifyPlaylistId) {
       setError('Please enter a valid Spotify playlist URL');
       return;
     }
@@ -36,14 +48,14 @@ export function ImportPlaylist({ onClose, onImported }: ImportPlaylistProps) {
 
     const sse = new EventSource(`${config.API_URL}/api/import-playlist?url=${encodeURIComponent(trimmed)}`);
 
-    sse.addEventListener('meta', (e) => {
-      meta = JSON.parse(e.data);
-      setProgress(prev => ({ ...prev, status: `Importing "${meta!.name}"...` }));
+    sse.addEventListener('meta', eventData => {
+      meta = JSON.parse(eventData.data);
+      setProgress(prev => ({ ...prev, status: `Importing "${meta?.name}"...` }));
     });
 
-    sse.addEventListener('tracks', (e) => {
-      const newTracks: ImportedTrack[] = JSON.parse(e.data);
-      allTracks.push(...newTracks);
+    sse.addEventListener('tracks', eventData => {
+      const nextTracks: ImportedTrack[] = JSON.parse(eventData.data);
+      allTracks.push(...nextTracks);
       setProgress({ tracks: allTracks.length, status: `Found ${allTracks.length} tracks...` });
     });
 
@@ -56,9 +68,13 @@ export function ImportPlaylist({ onClose, onImported }: ImportPlaylistProps) {
         return;
       }
 
-      const playlistId = `imported-${Date.now()}`;
+      const existingPlaylists: ImportedPlaylist[] = JSON.parse(localStorage.getItem('imported_playlists') || '[]');
+      const existingPlaylist = existingPlaylists.find(item =>
+        extractSpotifyPlaylistId(item.sourceUrl) === spotifyPlaylistId
+      );
+
       const playlist: ImportedPlaylist = {
-        id: playlistId,
+        id: existingPlaylist?.id || `imported-${spotifyPlaylistId}`,
         name: meta.name,
         description: meta.description,
         owner: meta.owner,
@@ -69,14 +85,12 @@ export function ImportPlaylist({ onClose, onImported }: ImportPlaylistProps) {
         importedAt: Date.now(),
       };
 
-      // Save to localStorage
-      const existing = JSON.parse(localStorage.getItem('imported_playlists') || '[]');
-      existing.push(playlist);
-      localStorage.setItem('imported_playlists', JSON.stringify(existing));
+      const updatedPlaylists = existingPlaylist
+        ? existingPlaylists.map(item => (item.id === existingPlaylist.id ? playlist : item))
+        : [...existingPlaylists, playlist];
 
-      // Dispatch event so other components (Sidebar) can sync
+      localStorage.setItem('imported_playlists', JSON.stringify(updatedPlaylists));
       window.dispatchEvent(new CustomEvent('playlist-imported', { detail: playlist }));
-
       onImported(playlist);
     });
 
@@ -88,63 +102,68 @@ export function ImportPlaylist({ onClose, onImported }: ImportPlaylistProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[300] flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="bg-[#1a1a1a] rounded-2xl w-full max-w-lg border border-white/10 shadow-2xl overflow-hidden"
-        onClick={e => e.stopPropagation()}
+        className="app-panel-strong w-full max-w-xl overflow-hidden rounded-[30px]"
+        onClick={event => event.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-5 border-b border-white/10">
-          <h2 className="text-lg font-bold text-white">Import Playlist</h2>
-          <button onClick={onClose} className="p-1.5 rounded-full hover:bg-white/10 transition-colors">
-            <X size={18} className="text-white/60" />
+        <div className="flex items-center justify-between border-b border-border/70 px-6 py-5">
+          <div>
+            <h2 className="text-lg font-bold text-text-primary">Import Playlist</h2>
+            <p className="mt-1 text-xs text-text-muted">Bring in any public Spotify playlist</p>
+          </div>
+          <button onClick={onClose} className="app-icon-button flex h-10 w-10 items-center justify-center rounded-full">
+            <X size={18} className="text-text-primary" />
           </button>
         </div>
 
-        <div className="p-5">
+        <div className="px-6 py-6">
           {!isImporting ? (
             <>
-              <p className="text-sm text-white/60 mb-4">
-                Paste a public Spotify playlist URL to import its tracks. No login required.
+              <p className="mb-5 text-sm leading-6 text-text-secondary">
+                Paste a public Spotify playlist URL and we will import its tracks into your local library. No extra login is required.
               </p>
+
               <form onSubmit={handleImport}>
-                <div className="flex items-center gap-2 bg-white/5 rounded-xl border border-white/10 px-4 py-3 focus-within:border-primary/50 transition-colors">
-                  <Link size={16} className="text-white/40 flex-shrink-0" />
+                <div className="app-input-shell flex items-center gap-3 rounded-2xl px-4 py-3">
+                  <Link size={16} className="shrink-0 text-text-muted" />
                   <input
                     ref={inputRef}
                     type="url"
                     value={url}
-                    onChange={e => { setUrl(e.target.value); setError(null); }}
+                    onChange={event => {
+                      setUrl(event.target.value);
+                      setError(null);
+                    }}
                     placeholder="https://open.spotify.com/playlist/..."
-                    className="flex-1 bg-transparent text-white text-sm placeholder:text-white/30 outline-none"
+                    className="w-full bg-transparent text-sm text-text-primary placeholder:text-text-muted outline-none"
                     required
                   />
                 </div>
 
-                {error && (
-                  <p className="text-accent-pink text-xs mt-2">{error}</p>
-                )}
+                {error ? (
+                  <p className="mt-3 text-xs text-danger">{error}</p>
+                ) : null}
 
                 <button
                   type="submit"
-                  className="w-full mt-4 py-3 bg-primary hover:bg-primary-hover text-black font-semibold rounded-xl transition-all hover:scale-[1.01] active:scale-[0.99] text-sm"
+                  className="app-button-primary mt-5 w-full rounded-2xl px-4 py-3 text-sm font-semibold"
                 >
                   Import Playlist
                 </button>
               </form>
 
-              <p className="text-xs text-white/20 mt-3 text-center">
-                Works with any public Spotify playlist
-              </p>
+              <p className="mt-4 text-center text-xs text-text-muted">Works with any public Spotify playlist</p>
             </>
           ) : (
-            <div className="flex flex-col items-center py-8">
-              <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4">
-                <Loader2 size={28} className="text-primary animate-spin" />
+            <div className="flex flex-col items-center py-10 text-center">
+              <div className="app-card mb-5 flex h-16 w-16 items-center justify-center rounded-full">
+                <Loader2 size={28} className="animate-spin text-primary" />
               </div>
-              <p className="text-white font-medium mb-1">{progress.status}</p>
-              {progress.tracks > 0 && (
-                <p className="text-white/40 text-sm">{progress.tracks} tracks found</p>
-              )}
+              <p className="text-sm font-medium text-text-primary">{progress.status}</p>
+              {progress.tracks > 0 ? (
+                <p className="mt-2 text-sm text-text-secondary">{progress.tracks} tracks found</p>
+              ) : null}
             </div>
           )}
         </div>

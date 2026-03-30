@@ -9,8 +9,8 @@ import { SearchBar } from './components/SearchBar';
 import { ResultList } from './components/ResultList';
 import { config } from './config';
 import { Track } from './types';
-import { Music } from 'lucide-react';
-import { extractDominantColor, normalizeAccentColor, setAccentColor } from './utils/colorExtractor';
+import { ChevronUp, Music } from 'lucide-react';
+import { applyAlbumTheme, DEFAULT_ALBUM_THEME, extractAlbumTheme } from './utils/colorExtractor';
 import { DynamicBackground } from './components/DynamicBackground';
 import './index.css';
 import './App.css';
@@ -56,8 +56,10 @@ function MainContent({
   const [searchResults, setSearchResults] = useState<Video[]>([]);
   const [isSearchLoading, setIsSearchLoading] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
+  const [showScrollToTop, setShowScrollToTop] = useState(false);
   const didRestoreLastPath = useRef(false);
   const replayNonceRef = useRef(0);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const matchPlaylist = useMatch('/playlist/:id');
   const location = useLocation();
@@ -259,9 +261,34 @@ function MainContent({
     setShowSearchResults(false);
   };
 
+  const updateScrollToTopVisibility = useCallback((node: HTMLDivElement | null) => {
+    if (!node) {
+      setShowScrollToTop(false);
+      return;
+    }
+
+    const { scrollTop } = node;
+    setShowScrollToTop(scrollTop > 24);
+  }, []);
+
+  const handleContentScroll = (event: React.UIEvent<HTMLDivElement>) => {
+    updateScrollToTopVisibility(event.currentTarget);
+  };
+
+  const handleScrollToTop = () => {
+    scrollContainerRef.current?.scrollTo({
+      top: 0,
+      behavior: 'smooth',
+    });
+  };
+
+  useEffect(() => {
+    updateScrollToTopVisibility(scrollContainerRef.current);
+  }, [location.pathname, showSearchResults, searchResults.length, updateScrollToTopVisibility]);
+
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden relative z-10">
-      <div className="sticky top-0 z-20 px-6 py-4 border-b border-white/10 bg-black/30 backdrop-blur-3xl">
+      <div className="sticky top-0 z-20 px-4 py-4 md:px-6 border-b border-border/60 bg-bg-primary/45 backdrop-blur-3xl shadow-[0_12px_30px_rgba(0,0,0,0.14)]">
         <SearchBar
           value={searchQuery}
           onChange={(val) => {
@@ -278,27 +305,34 @@ function MainContent({
         />
       </div>
 
-      <div className="flex-1 overflow-y-auto scrollbar-thin pb-[calc(160px+env(safe-area-inset-bottom))] md:pb-32">
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleContentScroll}
+        className="flex-1 overflow-y-auto scrollbar-thin pb-[calc(160px+env(safe-area-inset-bottom))] md:pb-32"
+      >
         <div className={showSearchResults ? "block" : "hidden"}>
-          <div className="px-8 py-6 animate-fadeIn">
+          <div className="px-6 py-6 md:px-8 animate-fadeIn">
             <div className="flex items-center justify-between mb-8">
               <div>
-                <h2 className="text-3xl font-bold text-white mb-2">Search Results</h2>
+                <h2 className="text-3xl font-bold text-text-primary mb-2">Search Results</h2>
                 <p className="text-text-secondary">
-                  Showing results for "<span className="text-white font-medium">{searchQuery}</span>"
+                  Showing results for "<span className="text-text-primary font-medium">{searchQuery}</span>"
                 </p>
               </div>
               <button
                 onClick={clearSearch}
-                className="px-6 py-3 rounded-full bg-[#121212] hover:bg-[#1a1a1a] text-text-secondary hover:text-white transition-all hover:scale-105 flex items-center gap-2"
+                className="app-button-secondary relative flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium text-transparent"
               >
-                ← Back to Library
+                <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-text-primary">
+                  Back to Library
+                </span>
+                Back to Library
               </button>
             </div>
 
             {isSearchLoading ? (
               <div className="flex flex-col items-center justify-center py-20">
-                <div className="w-16 h-16 border-4 border-[#1a1a1a] border-t-primary rounded-full animate-spin mb-6"></div>
+                <div className="w-16 h-16 border-4 border-bg-tertiary border-t-primary rounded-full animate-spin mb-6"></div>
                 <p className="text-text-muted text-lg">Searching...</p>
               </div>
             ) : searchResults.length > 0 ? (
@@ -310,10 +344,10 @@ function MainContent({
               />
             ) : (
               <div className="flex flex-col items-center justify-center py-20">
-                <div className="w-20 h-20 rounded-full bg-[#1a1a1a] flex items-center justify-center mb-6">
+                <div className="w-20 h-20 rounded-full bg-bg-secondary border border-border flex items-center justify-center mb-6 shadow-card">
                   <Music size={36} className="text-text-muted" />
                 </div>
-                <h3 className="text-2xl font-bold text-white mb-2">No results found</h3>
+                <h3 className="text-2xl font-bold text-text-primary mb-2">No results found</h3>
                 <p className="text-text-muted">Try searching with different keywords</p>
               </div>
             )}
@@ -331,6 +365,18 @@ function MainContent({
           />
         </div>
       </div>
+
+      <button
+        type="button"
+        onClick={handleScrollToTop}
+        className={`app-button-secondary fixed bottom-[calc(7rem+env(safe-area-inset-bottom))] right-4 z-30 flex h-10 w-10 items-center justify-center rounded-full shadow-card transition-all duration-200 md:bottom-28 md:right-6 ${
+          showScrollToTop ? 'pointer-events-auto translate-y-0 opacity-100' : 'pointer-events-none translate-y-3 opacity-0'
+        }`}
+        aria-label="Scroll to top"
+        title="Scroll to top"
+      >
+        <ChevronUp size={18} className="text-text-primary" />
+      </button>
 
       <Player
         currentTrack={currentTrack}
@@ -376,19 +422,37 @@ function MainLayout() {
 
   // Extract colors from current track
   useEffect(() => {
-    const extractColors = async () => {
-      if (!currentTrack) { setAccentColor('#ffffff'); return; }
+    let ignore = false;
+
+    const syncTheme = async () => {
+      if (!currentTrack) {
+        applyAlbumTheme(DEFAULT_ALBUM_THEME);
+        return;
+      }
+
       const imageUrl = currentTrack.image || currentTrack.thumbnail;
-      if (!imageUrl) { setAccentColor('#ffffff'); return; }
+      if (!imageUrl) {
+        applyAlbumTheme(DEFAULT_ALBUM_THEME);
+        return;
+      }
+
       try {
-        const hexColor = await extractDominantColor(imageUrl);
-        const safeColor = normalizeAccentColor(hexColor);
-        setAccentColor(safeColor);
+        const theme = await extractAlbumTheme(imageUrl);
+        if (!ignore) {
+          applyAlbumTheme(theme);
+        }
       } catch {
-        setAccentColor('#ffffff');
+        if (!ignore) {
+          applyAlbumTheme(DEFAULT_ALBUM_THEME);
+        }
       }
     };
-    extractColors();
+
+    syncTheme();
+
+    return () => {
+      ignore = true;
+    };
   }, [currentTrack]);
 
   useEffect(() => {
@@ -426,7 +490,7 @@ function MainLayout() {
   };
 
   return (
-    <div className="flex h-screen w-screen text-white overflow-hidden relative">
+    <div className="flex h-screen w-screen text-text-primary overflow-hidden relative bg-bg-base">
       <DynamicBackground currentTrack={currentTrack} />
       <Sidebar isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
       <MainContent

@@ -1,10 +1,57 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Play, Pause, SkipBack, SkipForward, Repeat, Shuffle, Volume2, VolumeX, Music } from 'lucide-react';
+import { SkipBack, SkipForward, Repeat, Shuffle, Volume2, VolumeX, Music } from 'lucide-react';
 import { Track } from '../types';
+import { SolidPauseIcon, SolidPlayIcon } from './PlaybackIcons';
+
+interface YouTubePlayer {
+    setVolume: (volume: number) => void;
+    loadVideoById: (options: { videoId: string; startSeconds: number }) => void;
+    cueVideoById: (options: { videoId: string; startSeconds: number }) => void;
+    getCurrentTime: () => number;
+    getDuration: () => number;
+    getPlayerState: () => number;
+    playVideo: () => void;
+    pauseVideo: () => void;
+    seekTo: (seconds: number, allowSeekAhead: boolean) => void;
+    destroy: () => void;
+    getVideoData?: () => { video_id?: string };
+}
+
+interface YouTubePlayerReadyEvent {
+    target: YouTubePlayer;
+}
+
+interface YouTubePlayerStateEvent {
+    data: number;
+    target: YouTubePlayer;
+}
+
+interface YouTubeNamespace {
+    Player: new (
+        elementId: string,
+        config: {
+            height: string;
+            width: string;
+            playerVars: Record<string, number | string>;
+            events: {
+                onReady?: (event: YouTubePlayerReadyEvent) => void;
+                onStateChange?: (event: YouTubePlayerStateEvent) => void;
+                onError?: (event: YouTubePlayerStateEvent) => void;
+            };
+        }
+    ) => YouTubePlayer;
+    PlayerState: {
+        PLAYING: number;
+        PAUSED: number;
+        BUFFERING: number;
+        ENDED: number;
+        CUED: number;
+    };
+}
 
 declare global {
     interface Window {
-        YT: any;
+        YT?: YouTubeNamespace;
         onYouTubeIframeAPIReady?: () => void;
     }
 }
@@ -51,7 +98,7 @@ function cleanSearchTerm(value: string): string {
     return value
         .normalize('NFKD')
         .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[\(\[][^\)\]]*[\)\]]/g, ' ')
+        .replace(/[([][^)\]]*[)\]]/g, ' ')
         .replace(/\b(?:feat\.?|ft\.?|featuring)\b[^,|/&-]*/gi, ' ')
         .replace(/\b(?:official|lyrics?|audio|video|visualizer|remaster(?:ed)?|explicit|clean)\b/gi, ' ')
         .replace(/[^\w\s&'/-]+/g, ' ')
@@ -123,7 +170,7 @@ export function Player({
 
     const [isLargeScreen, setIsLargeScreen] = useState(window.innerWidth >= 1024);
 
-    const ytPlayerRef = useRef<any>(null);
+    const ytPlayerRef = useRef<YouTubePlayer | null>(null);
     const ytReadyRef = useRef(false);
     const progressTimerRef = useRef<number | null>(null);
     const currentTrackIdRef = useRef<string | null>(null);
@@ -254,6 +301,22 @@ export function Player({
         });
     }, [onResolveTrackPlayback]);
 
+    const resetPlaybackUi = useCallback((loading: boolean) => {
+        setError(null);
+        setIsLoading(loading);
+        setProgress(0);
+        setCurrentTime(0);
+        setDuration(0);
+    }, []);
+
+    const setPlaybackFailure = useCallback((message: string) => {
+        currentCandidatesRef.current = [];
+        currentCandidateIndexRef.current = 0;
+        setError(message);
+        setIsLoading(false);
+        setIsPlaying(false);
+    }, [setIsPlaying]);
+
     const tryCandidateAtIndex = useCallback((trackId: string, index: number, autoplay: boolean) => {
         const youtubeId = currentCandidatesRef.current[index];
         if (!youtubeId) return false;
@@ -327,9 +390,10 @@ export function Player({
 
     useEffect(() => {
         const initPlayer = () => {
-            if (ytPlayerRef.current || !window.YT?.Player) return;
+            const youTubeApi = window.YT;
+            if (ytPlayerRef.current || !youTubeApi?.Player) return;
 
-            ytPlayerRef.current = new window.YT.Player('yt-player-container', {
+            ytPlayerRef.current = new youTubeApi.Player('yt-player-container', {
                 height: '1',
                 width: '1',
                 playerVars: {
@@ -340,7 +404,7 @@ export function Player({
                     playsinline: 1,
                 },
                 events: {
-                    onReady: (event: any) => {
+                    onReady: (event: YouTubePlayerReadyEvent) => {
                         ytReadyRef.current = true;
                         event.target.setVolume(volumeRef.current * 100);
 
@@ -349,23 +413,23 @@ export function Player({
                             loadIntoPlayer(pending.youtubeId, pending.autoplay);
                         }
                     },
-                    onStateChange: (event: any) => {
+                    onStateChange: (event: YouTubePlayerStateEvent) => {
                         switch (event.data) {
-                            case window.YT.PlayerState.PLAYING:
+                            case youTubeApi.PlayerState.PLAYING:
                                 setError(null);
                                 setIsPlaying(true);
                                 setIsLoading(false);
                                 startProgressTimer();
                                 break;
-                            case window.YT.PlayerState.PAUSED:
+                            case youTubeApi.PlayerState.PAUSED:
                                 setIsPlaying(false);
                                 setIsLoading(false);
                                 stopProgressTimer();
                                 break;
-                            case window.YT.PlayerState.BUFFERING:
+                            case youTubeApi.PlayerState.BUFFERING:
                                 setIsLoading(true);
                                 break;
-                            case window.YT.PlayerState.ENDED:
+                            case youTubeApi.PlayerState.ENDED: {
                                 setIsPlaying(false);
                                 setIsLoading(false);
                                 stopProgressTimer();
@@ -378,7 +442,8 @@ export function Player({
                                     onNext(isShuffle, repeatMode);
                                 }
                                 break;
-                            case window.YT.PlayerState.CUED:
+                            }
+                            case youTubeApi.PlayerState.CUED:
                                 setIsLoading(false);
                                 stopProgressTimer();
                                 break;
@@ -386,7 +451,7 @@ export function Player({
                                 break;
                         }
                     },
-                    onError: (event: any) => {
+                    onError: (event: YouTubePlayerStateEvent) => {
                         const activeTrackId = currentTrackIdRef.current;
                         if (!activeTrackId) return;
 
@@ -403,9 +468,7 @@ export function Player({
                         }
 
                         stopProgressTimer();
-                        setError('Playback error');
-                        setIsLoading(false);
-                        setIsPlaying(false);
+                        setPlaybackFailure('Playback error');
                     }
                 }
             });
@@ -437,10 +500,11 @@ export function Player({
                 ytPlayerRef.current = null;
             }
         };
-    }, [loadIntoPlayer, setIsPlaying, startProgressTimer, stopProgressTimer, tryCandidateAtIndex]);
+    }, [loadIntoPlayer, setIsPlaying, setPlaybackFailure, startProgressTimer, stopProgressTimer, tryCandidateAtIndex]);
 
     useEffect(() => {
         if (!ytPlayerRef.current?.getPlayerState || isLoading) return;
+        if (!window.YT) return;
 
         const playerState = ytPlayerRef.current.getPlayerState();
         if (isPlaying && playerState !== window.YT.PlayerState.PLAYING && playerState !== window.YT.PlayerState.BUFFERING) {
@@ -468,10 +532,7 @@ export function Player({
 
         if (isReplayRequest) {
             lastPlaybackNonceRef.current = playbackNonce;
-            setError(null);
-            setIsLoading(true);
-            setProgress(0);
-            setCurrentTime(0);
+            resetPlaybackUi(true);
             pendingSeekTimeRef.current = null;
             isSeekingRef.current = false;
 
@@ -493,11 +554,7 @@ export function Player({
         const gen = ++loadGenRef.current;
         currentTrackIdRef.current = trackId;
         lastPlaybackNonceRef.current = playbackNonce;
-        setIsLoading(true);
-        setError(null);
-        setProgress(0);
-        setCurrentTime(0);
-        setDuration(0);
+        resetPlaybackUi(true);
         pendingSeekTimeRef.current = null;
         isSeekingRef.current = false;
         stopProgressTimer();
@@ -521,19 +578,16 @@ export function Player({
                     setIsLoading(false);
                     setIsPlaying(false);
                 }
-            } catch (e: any) {
+            } catch (e: unknown) {
                 if (gen !== loadGenRef.current) return;
-                console.error('Failed to load track:', e?.name || 'Error', e?.message || e);
-                currentCandidatesRef.current = [];
-                currentCandidateIndexRef.current = 0;
-                setError('Failed to load track');
-                setIsLoading(false);
-                setIsPlaying(false);
+                const message = e instanceof Error ? e.message : String(e);
+                console.error('Failed to load track:', message);
+                setPlaybackFailure('Failed to load track');
             }
         };
 
         fetchAndLoad();
-    }, [currentTrack, loadIntoPlayer, persistResolvedTrack, resolveTrackPlayback, setIsPlaying, stopProgressTimer]);
+    }, [currentTrack, loadIntoPlayer, persistResolvedTrack, resetPlaybackUi, resolveTrackPlayback, setIsPlaying, setPlaybackFailure, stopProgressTimer]);
 
     const togglePlay = useCallback(() => {
         if (isLoading) return;
@@ -581,106 +635,128 @@ export function Player({
 
     if (!currentTrack) return null;
 
+    const progressStyle = {
+        background: `linear-gradient(90deg, rgb(var(--accent-color-rgb)) 0%, rgb(var(--accent-color-rgb)) ${progress}%, rgb(var(--surface-hover-rgb) / 0.52) ${progress}%, rgb(var(--surface-hover-rgb) / 0.52) 100%)`,
+    };
+
+    const volumeStyle = {
+        background: `linear-gradient(90deg, rgb(var(--accent-color-rgb)) 0%, rgb(var(--accent-color-rgb)) ${volume * 100}%, rgb(var(--surface-hover-rgb) / 0.52) ${volume * 100}%, rgb(var(--surface-hover-rgb) / 0.52) 100%)`,
+    };
+
+    const secondaryControlClass = 'text-text-secondary hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-45 transition-colors';
+    const activeControlClass = 'text-primary hover:text-primary-hover disabled:cursor-not-allowed disabled:opacity-45 transition-colors';
+
     return (
         <>
             <div id="yt-player-container" style={{ position: 'absolute', width: 1, height: 1, top: -9999, left: -9999 }} />
 
             <div
                 className="
-                    fixed bottom-0 left-0 right-0 
-                    h-auto min-h-[140px] md:h-24 md:min-h-0
-                    border-t border-white/10
+                    fixed bottom-0 left-0 right-0
                     z-[100]
-                    flex flex-col justify-end pb-0
-                    bg-black/30 backdrop-blur-3xl
+                    flex min-h-[128px] flex-col justify-end
+                    border-t border-border/70
+                    bg-bg-primary/44 backdrop-blur-3xl
+                    shadow-player
+                    md:h-24 md:min-h-0
                 "
                 style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
             >
                 <div
-                    className="absolute inset-0 opacity-10 pointer-events-none"
-                    style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.3), transparent)' }}
+                    className="pointer-events-none absolute inset-0 opacity-80"
+                    style={{ background: 'linear-gradient(to top, rgb(var(--support-dark-rgb) / 0.22), transparent)' }}
                 />
 
-                <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/10 md:hidden block z-20">
+                <div className="absolute left-0 right-0 top-0 z-20 block h-[2px] bg-border/40 md:hidden">
                     <div
-                        className="h-full bg-white transition-all duration-300"
-                        style={{ width: `${progress}%` }}
+                        className="h-full transition-all duration-300"
+                        style={{ ...progressStyle, width: `${progress}%` }}
                     />
                 </div>
 
                 <div
-                    className="relative z-10 flex flex-col md:flex-row items-center justify-between h-full px-4 md:px-6 py-3 md:py-0 transition-all duration-300 gap-3 md:gap-0"
+                    className="relative z-10 flex h-full flex-col items-center justify-between gap-2.5 px-4 py-2.5 transition-all duration-300 md:flex-row md:gap-0 md:px-6 md:py-0"
                     style={{ paddingRight: isSidebarOpen && isLargeScreen ? `${sidebarWidth + 24}px` : undefined }}
                 >
-                    <div className="flex items-center gap-3 w-full md:w-[30%] md:flex-none justify-start border-b border-white/5 md:border-none pb-2 md:pb-0">
-                        <div className="relative group/img flex-shrink-0">
-                            <img
-                                src={currentTrack.image || currentTrack.thumbnail || 'https://via.placeholder.com/56'}
-                                className="h-12 w-12 md:h-14 md:w-14 object-cover rounded shadow-card"
-                                alt="Cover"
-                            />
+                    <div className="flex w-full items-center justify-start gap-3 border-b border-border/40 pb-2 md:w-[30%] md:flex-none md:border-none md:pb-0">
+                        <div className="h-11 w-11 shrink-0 overflow-hidden rounded-[14px] bg-bg-secondary shadow-card md:h-14 md:w-14 md:rounded-2xl">
+                            {currentTrack.image || currentTrack.thumbnail ? (
+                                <img
+                                    src={currentTrack.image || currentTrack.thumbnail}
+                                    className="h-full w-full object-cover"
+                                    alt="Cover"
+                                />
+                            ) : (
+                                <div className="flex h-full w-full items-center justify-center bg-bg-secondary">
+                                    <Music size={18} className="text-text-muted" />
+                                </div>
+                            )}
                         </div>
-                        <div className="flex flex-col justify-center overflow-hidden min-w-0 flex-1">
-                            <span className="text-sm font-medium truncate hover:underline cursor-pointer text-white leading-tight">
+                        <div className="flex min-w-0 flex-1 flex-col justify-center">
+                            <span className="truncate text-sm font-medium leading-tight text-text-primary">
                                 {currentTrack.name || 'No Title'}
                             </span>
-                            <span className="text-xs truncate opacity-70 text-[#E0E0E0] leading-tight mt-0.5">
+                            <span className="mt-0.5 truncate text-xs leading-tight text-text-secondary">
                                 {isLoading ? (
-                                    <span className="opacity-70">Loading...</span>
+                                    <span className="text-text-muted">Loading...</span>
                                 ) : error ? (
-                                    <span className="text-accent-pink">{error}</span>
+                                    <span className="text-danger">{error}</span>
                                 ) : (
                                     currentTrack.artist || 'Unknown Artist'
                                 )}
                             </span>
                         </div>
-                        {onToggleNowPlaying && (
-                            <button onClick={onToggleNowPlaying} className="md:hidden transition-all text-white/60 hover:text-white p-2" title="Now Playing" disabled={isLoading}>
-                                <Music size={20} strokeWidth={2} />
+                        {onToggleNowPlaying ? (
+                            <button
+                                onClick={onToggleNowPlaying}
+                                className="app-icon-button flex h-9 w-9 items-center justify-center rounded-full md:hidden"
+                                title="Now Playing"
+                                disabled={isLoading}
+                            >
+                                <Music size={18} className="text-text-primary" strokeWidth={2} />
                             </button>
-                        )}
+                        ) : null}
                     </div>
 
-                    <div className="flex flex-col items-center justify-center w-full md:flex-1 md:w-[40%] md:max-w-[600px] gap-2">
-                        <div className="flex items-center justify-between w-full md:justify-center md:gap-6 px-4 md:px-0">
-                            <button onClick={toggleShuffle} className={`transition-all duration-150 ${isShuffle ? 'text-[#1DB954]' : 'text-white/70 hover:text-white'}`} disabled={isLoading} title="Shuffle">
+                    <div className="flex w-full flex-col items-center justify-center gap-2 md:w-[40%] md:max-w-[600px] md:flex-1">
+                        <div className="flex w-full items-center justify-between px-2 md:justify-center md:gap-6 md:px-0">
+                            <button onClick={toggleShuffle} className={isShuffle ? activeControlClass : secondaryControlClass} disabled={isLoading} title="Shuffle">
                                 <Shuffle size={18} strokeWidth={2} />
                             </button>
-                            <button onClick={() => onPrev(isShuffle, repeatMode)} className="transition-all hover:scale-105 text-white/70 hover:text-white" disabled={isLoading} title="Previous">
+                            <button onClick={() => onPrev(isShuffle, repeatMode)} className={secondaryControlClass} disabled={isLoading} title="Previous">
                                 <SkipBack size={22} className="md:w-5 md:h-5" fill="currentColor" strokeWidth={0} />
                             </button>
                             <button
                                 onClick={togglePlay}
-                                className="w-10 h-10 md:w-10 md:h-10 bg-white rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-95 text-black shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="app-button-primary flex h-10 w-10 items-center justify-center rounded-full shadow-glow transition-transform hover:scale-[1.03] active:scale-95 disabled:cursor-not-allowed disabled:opacity-55 md:h-11 md:w-11"
                                 disabled={isLoading || !currentTrack}
                                 title={isPlaying ? 'Pause' : 'Play'}
                             >
                                 {isLoading ? (
-                                    <div className="w-4 h-4 md:w-4 md:h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                                    <div className="h-4 w-4 rounded-full border-2 border-primary-foreground border-t-transparent animate-spin" />
                                 ) : isPlaying ? (
-                                    <Pause size={20} className="md:w-5 md:h-5" fill="currentColor" strokeWidth={0} />
+                                    <SolidPauseIcon className="h-5 w-5 text-primary-foreground" />
                                 ) : (
-                                    <Play size={20} className="md:w-5 md:h-5 ml-0.5" fill="currentColor" strokeWidth={0} />
+                                    <SolidPlayIcon className="h-5 w-5 text-primary-foreground" />
                                 )}
                             </button>
-                            <button onClick={() => onNext(isShuffle, repeatMode)} className="transition-all hover:scale-105 text-white/70 hover:text-white" disabled={isLoading} title="Next">
+                            <button onClick={() => onNext(isShuffle, repeatMode)} className={secondaryControlClass} disabled={isLoading} title="Next">
                                 <SkipForward size={22} className="md:w-5 md:h-5" fill="currentColor" strokeWidth={0} />
                             </button>
-                            <button onClick={toggleRepeat} className={`transition-all duration-150 relative hover:scale-105 ${repeatMode > 0 ? 'text-[#1DB954]' : 'text-white/70 hover:text-white'}`} disabled={isLoading} title={repeatMode === 0 ? 'Repeat' : repeatMode === 1 ? 'Repeat All' : 'Repeat One'}>
+                            <button onClick={toggleRepeat} className={`relative ${repeatMode > 0 ? activeControlClass : secondaryControlClass}`} disabled={isLoading} title={repeatMode === 0 ? 'Repeat' : repeatMode === 1 ? 'Repeat All' : 'Repeat One'}>
                                 <Repeat size={18} strokeWidth={2} />
-                                {repeatMode === 2 && <span className="absolute -top-1 left-1/2 -translate-x-1/2 text-[8px] font-bold">1</span>}
+                                {repeatMode === 2 ? <span className="absolute -top-1 left-1/2 -translate-x-1/2 text-[8px] font-bold">1</span> : null}
                             </button>
-                            {onToggleNowPlaying && (
-                                <button onClick={onToggleNowPlaying} className="hidden md:block transition-all text-white/60 hover:text-white" title="Now Playing" disabled={isLoading}>
+                            {onToggleNowPlaying ? (
+                                <button onClick={onToggleNowPlaying} className="hidden md:block text-text-secondary transition-colors hover:text-text-primary" title="Now Playing" disabled={isLoading}>
                                     <Music size={18} strokeWidth={2} />
                                 </button>
-                            )}
+                            ) : null}
                         </div>
 
-                        <div className="flex items-center gap-2 w-full text-xs text-white/70">
-                            <span className="min-w-[35px] text-right tabular-nums text-[10px] md:text-xs">{formatTime(currentTime)}</span>
-                            <div className="flex-1 h-1 rounded-full relative group cursor-pointer bg-white/20">
-                                <div className="absolute top-0 left-0 h-full rounded-full transition-all bg-white group-hover:bg-primary" style={{ width: `${progress}%` }} />
+                        <div className="flex w-full items-center gap-2 text-xs text-text-secondary">
+                            <span className="min-w-[35px] text-right text-[10px] tabular-nums md:text-xs">{formatTime(currentTime)}</span>
+                            <div className="relative h-1.5 flex-1 cursor-pointer rounded-full" style={progressStyle}>
                                 <input
                                     type="range"
                                     min="0"
@@ -694,21 +770,20 @@ export function Player({
                                     onMouseUp={() => commitSeek()}
                                     onTouchStart={handleSeekStart}
                                     onTouchEnd={() => commitSeek()}
-                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                                     disabled={isLoading}
                                 />
                             </div>
-                            <span className="min-w-[35px] tabular-nums text-[10px] md:text-xs">{formatTime(duration)}</span>
+                            <span className="min-w-[35px] text-[10px] tabular-nums md:text-xs">{formatTime(duration)}</span>
                         </div>
                     </div>
 
-                    <div className="hidden md:flex items-center justify-end w-full md:w-[30%] min-w-[140px] gap-2 px-4 md:px-0 pb-2 md:pb-0">
-                        <button onClick={toggleMute} className="transition-all text-white/70 hover:text-white" title={volume === 0 ? 'Unmute' : 'Mute'}>
+                    <div className="hidden w-full min-w-[140px] items-center justify-end gap-2 px-4 pb-2 md:flex md:w-[30%] md:px-0 md:pb-0">
+                        <button onClick={toggleMute} className={secondaryControlClass} title={volume === 0 ? 'Unmute' : 'Mute'}>
                             {volume === 0 ? <VolumeX size={18} strokeWidth={2} /> : <Volume2 size={18} strokeWidth={2} />}
                         </button>
-                        <div className="group relative w-16 md:w-20 h-1 rounded-full cursor-pointer bg-white/20">
-                            <div className="absolute top-0 left-0 h-full rounded-full transition-all bg-white" style={{ width: `${volume * 100}%` }} />
-                            <input type="range" min="0" max="1" step="0.01" value={volume} onChange={handleVolume} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                        <div className="relative h-1.5 w-16 rounded-full md:w-20" style={volumeStyle}>
+                            <input type="range" min="0" max="1" step="0.01" value={volume} onChange={handleVolume} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
                         </div>
                     </div>
                 </div>
