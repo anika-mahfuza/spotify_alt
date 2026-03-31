@@ -232,7 +232,7 @@ export function NowPlayingSidebar({
             {artistPlaylists.length ? (
               <div className="mt-6 rounded-[24px] app-panel p-4">
                 <div className="mb-4">
-                  <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-text-muted">Artist playlists</h4>
+                  <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-text-muted">More playlists</h4>
                   <p className="mt-1 text-xs text-text-secondary">From Spotify artist page</p>
                 </div>
 
