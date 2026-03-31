@@ -8,7 +8,7 @@ import { Home } from './components/Home';
 import { SearchBar } from './components/SearchBar';
 import { ResultList } from './components/ResultList';
 import { config } from './config';
-import { Artist, ImportedPlaylist, Track } from './types';
+import { Artist, ImportedPlaylist, ImportedTrack, Track } from './types';
 import { ChevronUp, Music } from 'lucide-react';
 import { applyAlbumTheme, DEFAULT_ALBUM_THEME, extractAlbumTheme } from './utils/colorExtractor';
 import { DynamicBackground } from './components/DynamicBackground';
@@ -46,21 +46,129 @@ function getImportedPlaylistsSnapshot(): ImportedPlaylist[] {
   }
 }
 
+function hasNonAscii(value?: string): boolean {
+  return Array.from(String(value || '')).some(char => char.charCodeAt(0) > 127);
+}
+
+function shouldRepairImportedTrack(track: ImportedTrack): boolean {
+  return !!(track.spotifyTrackId || extractSpotifyTrackId(track.url)) && hasNonAscii(track.artist);
+}
+
+interface SpotifyTrackDetailsResponse {
+  id: string;
+  name?: string;
+  artist?: string;
+  artistId?: string;
+  artistIds?: string[];
+  image?: string;
+  spotifyUrl?: string;
+}
+
+async function repairImportedPlaylists(apiUrl: string, signal?: AbortSignal): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+
+  const raw = window.localStorage.getItem('imported_playlists');
+  if (!raw) return false;
+
+  let playlists: ImportedPlaylist[];
+  try {
+    playlists = JSON.parse(raw);
+  } catch {
+    return false;
+  }
+
+  const trackIds = [...new Set(
+    playlists
+      .flatMap(playlist => playlist.tracks)
+      .filter(shouldRepairImportedTrack)
+      .map(track => track.spotifyTrackId || extractSpotifyTrackId(track.url))
+      .filter(Boolean)
+  )] as string[];
+
+  if (!trackIds.length) return false;
+
+  const detailsMap = new Map<string, SpotifyTrackDetailsResponse>();
+  const batchSize = 6;
+
+  for (let index = 0; index < trackIds.length; index += batchSize) {
+    const batch = trackIds.slice(index, index + batchSize);
+    const results = await Promise.all(batch.map(async trackId => {
+      try {
+        const response = await fetch(`${apiUrl}/api/track-details?trackId=${encodeURIComponent(trackId)}`, { signal });
+        if (!response.ok) return null;
+        const details: SpotifyTrackDetailsResponse = await response.json();
+        return [trackId, details] as const;
+      } catch {
+        return null;
+      }
+    }));
+
+    for (const result of results) {
+      if (!result) continue;
+      detailsMap.set(result[0], result[1]);
+    }
+  }
+
+  if (!detailsMap.size) return false;
+
+  let changed = false;
+  const nextPlaylists = playlists.map(playlist => ({
+    ...playlist,
+    tracks: playlist.tracks.map(track => {
+      const trackId = track.spotifyTrackId || extractSpotifyTrackId(track.url);
+      const details = trackId ? detailsMap.get(trackId) : undefined;
+      if (!details) return track;
+
+      const nextTrack: ImportedTrack = {
+        ...track,
+        name: details.name || track.name,
+        artist: details.artist || track.artist,
+        image: details.image || track.image,
+        artistId: details.artistId || track.artistId,
+        artistIds: details.artistIds?.length ? details.artistIds : track.artistIds,
+        spotifyTrackId: track.spotifyTrackId || trackId,
+        url: details.spotifyUrl || track.url,
+      };
+
+      if (
+        nextTrack.name !== track.name ||
+        nextTrack.artist !== track.artist ||
+        nextTrack.image !== track.image ||
+        nextTrack.artistId !== track.artistId ||
+        nextTrack.url !== track.url ||
+        JSON.stringify(nextTrack.artistIds || []) !== JSON.stringify(track.artistIds || [])
+      ) {
+        changed = true;
+      }
+
+      return nextTrack;
+    }),
+  }));
+
+  if (!changed) return false;
+
+  window.localStorage.setItem('imported_playlists', JSON.stringify(nextPlaylists));
+  window.dispatchEvent(new Event('playlist-imported'));
+  return true;
+}
+
 function enrichTrackWithImportedMetadata(track: Track | null): Track | null {
   if (!track || track.isYoutube) return track;
-  if (track.artistId && track.spotifyTrackId) return track;
 
   const targetName = normalizeLookup(track.name);
   const targetArtist = normalizeLookup(track.artist);
   const targetAlbum = normalizeLookup(track.album);
+  const targetSpotifyTrackId = track.spotifyTrackId || extractSpotifyTrackId(track.spotifyUrl);
 
   for (const playlist of getImportedPlaylistsSnapshot()) {
     for (const importedTrack of playlist.tracks) {
+      const importedSpotifyTrackId = importedTrack.spotifyTrackId || extractSpotifyTrackId(importedTrack.url);
+      const sameSpotifyTrack = !!targetSpotifyTrackId && importedSpotifyTrackId === targetSpotifyTrackId;
       const sameName = normalizeLookup(importedTrack.name) === targetName;
       const sameArtist = normalizeLookup(importedTrack.artist) === targetArtist;
       const sameAlbum = !targetAlbum || normalizeLookup(importedTrack.album) === targetAlbum;
 
-      if (!sameName || !sameArtist || !sameAlbum) continue;
+      if (!sameSpotifyTrack && (!sameName || !sameArtist || !sameAlbum)) continue;
 
       const artistIds = importedTrack.artistIds?.filter(Boolean);
       const spotifyTrackId = importedTrack.spotifyTrackId || extractSpotifyTrackId(importedTrack.url);
@@ -70,6 +178,10 @@ function enrichTrackWithImportedMetadata(track: Track | null): Track | null {
       const nextSpotifyUrl = track.spotifyUrl || importedTrack.url || undefined;
 
       if (
+        importedTrack.name === track.name &&
+        importedTrack.artist === track.artist &&
+        importedTrack.album === track.album &&
+        (track.image || importedTrack.image || undefined) === track.image &&
         nextArtistId === track.artistId &&
         nextArtistIds === track.artistIds &&
         nextSpotifyTrackId === track.spotifyTrackId &&
@@ -80,6 +192,10 @@ function enrichTrackWithImportedMetadata(track: Track | null): Track | null {
 
       return {
         ...track,
+        name: importedTrack.name || track.name,
+        artist: importedTrack.artist || track.artist,
+        album: importedTrack.album || track.album,
+        image: track.image || importedTrack.image || undefined,
         artistId: nextArtistId,
         artistIds: nextArtistIds,
         spotifyTrackId: nextSpotifyTrackId,
@@ -519,9 +635,14 @@ function MainLayout() {
     const saved = localStorage.getItem('player_current_index');
     return saved ? parseInt(saved) : 0;
   });
+  const artistDetailsCacheRef = useRef<Map<string, Artist>>(new Map());
   const artistTopTrackQueue = useMemo(() => buildArtistTopTrackQueue(artistDetails), [artistDetails]);
   const artistDetailsLookupKey = currentTrack
-    ? `${currentTrack.artistId || ''}__${currentTrack.spotifyTrackId || ''}__${currentTrack.id || ''}`
+    ? (currentTrack.artistId
+      ? `artist:${currentTrack.artistId}`
+      : currentTrack.spotifyTrackId
+        ? `track:${currentTrack.spotifyTrackId}`
+        : '')
     : '';
   const openMobileMenu = useCallback(() => setIsMobileMenuOpen(true), []);
   const closeMobileMenu = useCallback(() => setIsMobileMenuOpen(false), []);
@@ -566,6 +687,29 @@ function MainLayout() {
   }, [sidebarWidth]);
 
   useEffect(() => {
+    const controller = new AbortController();
+
+    const repairImportedMetadata = async () => {
+      try {
+        const changed = await repairImportedPlaylists(config.API_URL, controller.signal);
+        if (!changed) return;
+
+        setCurrentTrack(prev => enrichTrackWithImportedMetadata(prev));
+        setQueue(prev => prev.map(track => enrichTrackWithImportedMetadata(track) || track));
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        console.error('Imported playlist repair failed', error);
+      }
+    };
+
+    repairImportedMetadata();
+
+    return () => {
+      controller.abort();
+    };
+  }, []);
+
+  useEffect(() => {
     const enrichedCurrentTrack = enrichTrackWithImportedMetadata(currentTrack);
     if (enrichedCurrentTrack !== currentTrack) {
       setCurrentTrack(enrichedCurrentTrack);
@@ -585,7 +729,7 @@ function MainLayout() {
   }, []);
 
   useEffect(() => {
-    if (!isNowPlayingSidebarOpen || !currentTrack || currentTrack.isYoutube) {
+    if (!currentTrack || currentTrack.isYoutube) {
       setArtistDetails(null);
       return;
     }
@@ -604,6 +748,17 @@ function MainLayout() {
     }
 
     const controller = new AbortController();
+    const cachedArtistDetails = artistDetailsLookupKey
+      ? artistDetailsCacheRef.current.get(artistDetailsLookupKey)
+      : undefined;
+
+    if (cachedArtistDetails) {
+      setArtistDetails(cachedArtistDetails);
+      return () => {
+        controller.abort();
+      };
+    }
+
     setArtistDetails(null);
 
     const loadArtistDetails = async () => {
@@ -617,6 +772,9 @@ function MainLayout() {
         }
 
         const data: Artist = await response.json();
+        if (artistDetailsLookupKey) {
+          artistDetailsCacheRef.current.set(artistDetailsLookupKey, data);
+        }
         setArtistDetails(data);
       } catch (error) {
         if (controller.signal.aborted) return;
@@ -630,7 +788,7 @@ function MainLayout() {
     return () => {
       controller.abort();
     };
-  }, [artistDetailsLookupKey, isNowPlayingSidebarOpen, currentTrack]);
+  }, [artistDetailsLookupKey, currentTrack]);
 
   const handleSelectQueueIndex = (index: number) => {
     if (index < 0 || index >= queue.length) return;

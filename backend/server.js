@@ -192,6 +192,7 @@ function parseTrackEmbedDetails(entity) {
   })).filter(image => image.url);
 
   return {
+    name: entity.title || undefined,
     id: trackId,
     artist: (entity.artists || []).map(artist => artist?.name).filter(Boolean).join(', ') || undefined,
     artistId: artistIds[0] || undefined,
@@ -200,6 +201,67 @@ function parseTrackEmbedDetails(entity) {
     duration_ms: typeof entity.duration === 'number' ? entity.duration : undefined,
     previewUrl: entity.audioPreview?.url || undefined,
   };
+}
+
+function shouldNormalizeImportedTrack(track) {
+  if (!track?.spotifyTrackId) return false;
+  if (!track.artist) return true;
+  return /[^\u0000-\u007f]/.test(track.artist);
+}
+
+async function enrichImportedTrackWithEmbedDetails(track) {
+  if (!shouldNormalizeImportedTrack(track)) return track;
+
+  const trackId = extractSpotifyId(track.spotifyTrackId || track.url);
+  if (!trackId) return track;
+
+  const cacheKey = `imported_track_embed_${trackId}`;
+  const cached = getCached(cacheKey);
+  if (cached) {
+    return {
+      ...track,
+      ...cached,
+    };
+  }
+
+  try {
+    const trackData = await fetchSpotifyEmbedState(`track/${trackId}`);
+    const details = parseTrackEmbedDetails(trackData?.entity);
+    if (!details) return track;
+
+    const normalizedTrack = {
+      name: details.name || track.name,
+      artist: details.artist || track.artist,
+      artistId: details.artistId || track.artistId,
+      artistIds: details.artistIds?.length ? details.artistIds : track.artistIds,
+      image: details.image || track.image,
+      duration: details.duration_ms ? msToTime(details.duration_ms) : track.duration,
+      spotifyTrackId: trackId,
+      url: `https://open.spotify.com/track/${trackId}`,
+    };
+
+    setCache(cacheKey, normalizedTrack);
+    return {
+      ...track,
+      ...normalizedTrack,
+    };
+  } catch (error) {
+    console.warn(`[Import] Track embed normalization failed for ${trackId}:`, error.message);
+    return track;
+  }
+}
+
+async function enrichImportedTracks(tracks) {
+  const enriched = [];
+  const batchSize = 8;
+
+  for (let index = 0; index < tracks.length; index += batchSize) {
+    const batch = tracks.slice(index, index + batchSize);
+    const normalizedBatch = await Promise.all(batch.map(enrichImportedTrackWithEmbedDetails));
+    enriched.push(...normalizedBatch);
+  }
+
+  return enriched;
 }
 
 async function enrichArtistTopTrack(track) {
@@ -386,12 +448,29 @@ function normalizeSongQuery(value) {
     .toLowerCase();
 }
 
+function normalizeVariantSurface(value) {
+  return String(value || '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\w\s&'/-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
 function getPrimaryArtistQuery(value) {
   const normalized = normalizeSongQuery(value);
   return normalized
     .split(/\s*(?:,|&|\/|\||;|\bx\b|\band\b)\s*/i)
     .map(part => part.trim())
     .find(Boolean) || normalized;
+}
+
+function stripVariantTerms(value) {
+  return normalizeVariantSurface(value)
+    .replace(/\b(?:nightcore|slowed|reverb|sped up|sped|speed up|remix|live|cover|karaoke|instrumental|acoustic|edit|version|ver|8d audio|bass boosted|mashup|fan made)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function buildSongSearchQueries(query, context = {}) {
@@ -433,6 +512,14 @@ function scoreResult(result, query, context = {}) {
   const qArtist = normalizeSongQuery(context.artist);
   const title = normalizeSongQuery(result.title || '');
   const artist = normalizeSongQuery(result.artist || '');
+  const variantTitle = normalizeVariantSurface(result.title || '');
+  const variantArtist = normalizeVariantSurface(result.artist || '');
+  const strippedTitle = stripVariantTerms(result.title || '');
+  const queryText = [
+    normalizeVariantSurface(query),
+    normalizeVariantSurface(context.title),
+    normalizeVariantSurface(context.artist),
+  ].filter(Boolean).join(' ');
   let score = 0;
   const titleWords = qTitle.split(/\s+/).filter(Boolean);
   const artistWords = qArtist.split(/\s+/).filter(Boolean);
@@ -477,6 +564,8 @@ function scoreResult(result, query, context = {}) {
     'slowed',
     'reverb',
     'sped up',
+    'speed up',
+    'sped',
     'edit',
     'shorts',
     'snippet',
@@ -499,10 +588,14 @@ function scoreResult(result, query, context = {}) {
     'fan made'
   ];
   for (const p of heavyPenalties) {
-    if ((title.includes(p) || artist.includes(p)) && !q.includes(p)) score -= 90;
+    if ((variantTitle.includes(p) || variantArtist.includes(p)) && !queryText.includes(p)) score -= 140;
   }
   for (const p of mediumPenalties) {
-    if ((title.includes(p) || artist.includes(p)) && !q.includes(p)) score -= 45;
+    if ((variantTitle.includes(p) || variantArtist.includes(p)) && !queryText.includes(p)) score -= 70;
+  }
+
+  if (qTitle && strippedTitle === qTitle && strippedTitle !== variantTitle && !queryText.includes('slowed') && !queryText.includes('reverb') && !queryText.includes('sped') && !queryText.includes('speed up') && !queryText.includes('nightcore') && !queryText.includes('remix') && !queryText.includes('live') && !queryText.includes('cover')) {
+    score -= 160;
   }
 
   const durationMs = Number(result.durationMs) || 0;
@@ -820,7 +913,7 @@ app.get('/api/import-playlist', async (req, res) => {
     console.log(`Playlist: "${playlistName}" (${totalCount} tracks)`);
 
     // Parse and send first page tracks
-    const firstTracks = parseGraphQLTracks(firstItems);
+    const firstTracks = await enrichImportedTracks(parseGraphQLTracks(firstItems));
     res.write(`event: tracks\ndata: ${JSON.stringify(firstTracks)}\n\n`);
     console.log(`Page 1: ${firstTracks.length} tracks`);
 
@@ -835,7 +928,7 @@ app.get('/api/import-playlist', async (req, res) => {
         const items = pageData?.data?.playlistV2?.content?.items || [];
         if (items.length === 0) break;
 
-        const tracks = parseGraphQLTracks(items);
+        const tracks = await enrichImportedTracks(parseGraphQLTracks(items));
         res.write(`event: tracks\ndata: ${JSON.stringify(tracks)}\n\n`);
         console.log(`Page ${page + 1}: ${tracks.length} tracks`);
       }
@@ -902,6 +995,36 @@ app.get('/api/artist-details', async (req, res) => {
   } catch (e) {
     console.error('Artist details error:', e.message);
     res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/track-details', async (req, res) => {
+  const normalizedTrackId = extractSpotifyId(req.query.trackId);
+  if (!normalizedTrackId) {
+    return res.status(400).json({ error: 'trackId is required' });
+  }
+
+  try {
+    const cacheKey = `track_details_${normalizedTrackId}`;
+    const cached = getCached(cacheKey);
+    if (cached) return res.json(cached);
+
+    const trackData = await fetchSpotifyEmbedState(`track/${normalizedTrackId}`);
+    const details = parseTrackEmbedDetails(trackData?.entity);
+    if (!details) {
+      return res.status(404).json({ error: 'Track details unavailable' });
+    }
+
+    const result = {
+      ...details,
+      spotifyUrl: `https://open.spotify.com/track/${normalizedTrackId}`,
+    };
+
+    setCache(cacheKey, result);
+    res.json(result);
+  } catch (error) {
+    console.error('Track details error:', error.message);
+    res.status(500).json({ error: error.message });
   }
 });
 
