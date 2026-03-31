@@ -1233,6 +1233,6 @@ app.get('*', (req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0',() => {
   console.log(`\n  Music Player Backend running → http://127.0.0.1:${PORT}\n`);
 });
