@@ -339,7 +339,7 @@ app.use(express.json());
 
 // ─── Root Route ───────────────────────────────────────────────────────────────
 app.get('/', (req, res) => {
-  res.json({ message: 'Music Player Backend is running', status: 'ok' });
+  res.json({ message: 'Music Player Backend is running', status: 'ok', service: 'music-player-backend' });
 });
 
 app.get('/health', (req, res) => {
