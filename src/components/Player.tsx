@@ -2,6 +2,8 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { SkipBack, SkipForward, Repeat, Shuffle, Volume2, VolumeX, Music } from 'lucide-react';
 import { Track } from '../types';
 import { SolidPauseIcon, SolidPlayIcon } from './PlaybackIcons';
+import { backendClient } from '../api/client';
+import { BACKEND_ENDPOINTS } from '../api/endpoints';
 
 interface YouTubePlayer {
     setVolume: (volume: number) => void;
@@ -70,7 +72,6 @@ interface PlayerProps {
     nextTrack: Track | null;
     onNext: (isShuffle?: boolean, repeatMode?: number) => void;
     onPrev: (isShuffle?: boolean, repeatMode?: number) => void;
-    backendUrl: string;
     isPlaying: boolean;
     setIsPlaying: (playing: boolean) => void;
     onResolveTrackPlayback?: (trackId: string, updates: Pick<Track, 'youtubeId' | 'youtubeCandidates'>) => void;
@@ -137,7 +138,6 @@ export function Player({
     currentTrack,
     onNext,
     onPrev,
-    backendUrl,
     isPlaying,
     setIsPlaying,
     onResolveTrackPlayback,
@@ -338,19 +338,20 @@ export function Player({
         }
 
         const queries = buildTrackQueries(track);
-        const trackParams = new URLSearchParams({
+        const trackParams: Record<string, string | undefined> = {
             title: track.name,
             artist: track.artist,
-        });
+        };
 
         for (const query of queries) {
             try {
-                const params = new URLSearchParams(trackParams);
-                params.set('q', query);
-                const res = await fetch(`${backendUrl}/api/best-match?${params.toString()}`);
-                if (!res.ok) continue;
-
-                const data: BestMatchResponse = await res.json();
+                const data: BestMatchResponse = await backendClient.get<BestMatchResponse>(
+                    BACKEND_ENDPOINTS.BEST_MATCH,
+                    {
+                        params: { ...trackParams, q: query },
+                        timeout: 15000,
+                    }
+                );
                 const candidateIds = normalizeCandidateIds(data.candidates, data.id);
                 if (candidateIds.length > 0) {
                     return {
@@ -366,12 +367,13 @@ export function Player({
         for (const query of queries) {
             for (const endpoint of ['/api/search', '/search']) {
                 try {
-                    const params = new URLSearchParams(trackParams);
-                    params.set('q', query);
-                    const searchRes = await fetch(`${backendUrl}${endpoint}?${params.toString()}`);
-                    if (!searchRes.ok) continue;
-
-                    const searchResults: SearchResponseItem[] = await searchRes.json();
+                    const searchResults = await backendClient.get<SearchResponseItem[]>(
+                        endpoint,
+                        {
+                            params: { ...trackParams, q: query },
+                            timeout: 15000,
+                        }
+                    );
                     const fallbackCandidates = normalizeCandidateIds(searchResults.map(result => result.id));
                     if (fallbackCandidates.length > 0) {
                         return {
@@ -386,7 +388,7 @@ export function Player({
         }
 
         throw new Error(`Failed to find match for "${track.name}"`);
-    }, [backendUrl]);
+    }, []);
 
     useEffect(() => {
         const initPlayer = () => {
@@ -648,7 +650,7 @@ export function Player({
 
     return (
         <>
-            <div id="yt-player-container" style={{ position: 'absolute', width: 1, height: 1, top: -9999, left: -9999 }} />
+            <div id="yt-player-container" style={{ position: 'fixed', width: 1, height: 1, opacity: 0, pointerEvents: 'none', bottom: 0, right: 0, zIndex: -1 }} />
 
             <div
                 className="

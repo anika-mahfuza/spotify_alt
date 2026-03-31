@@ -628,7 +628,6 @@ function MainContent({
         nextTrack={queue.length > 0 ? queue[(currentIndex + 1) % queue.length] : null}
         onNext={handleNext}
         onPrev={handlePrev}
-        backendUrl={config.API_URL}
         isPlaying={isPlaying}
         setIsPlaying={setIsPlaying}
         onResolveTrackPlayback={handleResolveTrackPlayback}
