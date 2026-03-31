@@ -1,16 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, Loader2, X } from 'lucide-react';
 import { config } from '../config';
-import { ImportedPlaylist, ImportedTrack } from '../types';
+import { ImportedPlaylist } from '../types';
+import { extractSpotifyPlaylistId, importOrReuseSpotifyPlaylist } from '../utils/spotifyPlaylistImport';
 
 interface ImportPlaylistProps {
   onClose: () => void;
   onImported: (playlist: ImportedPlaylist) => void;
-}
-
-function extractSpotifyPlaylistId(url: string): string | null {
-  const match = url.match(/playlist\/([a-zA-Z0-9]+)/);
-  return match?.[1] || null;
 }
 
 export function ImportPlaylist({ onClose, onImported }: ImportPlaylistProps) {
@@ -19,12 +15,17 @@ export function ImportPlaylist({ onClose, onImported }: ImportPlaylistProps) {
   const [progress, setProgress] = useState<{ tracks: number; status: string }>({ tracks: 0, status: '' });
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const importAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     inputRef.current?.focus();
+
+    return () => {
+      importAbortRef.current?.abort();
+    };
   }, []);
 
-  const handleImport = (event: React.FormEvent) => {
+  const handleImport = async (event: React.FormEvent) => {
     event.preventDefault();
 
     const trimmed = url.trim();
@@ -43,62 +44,28 @@ export function ImportPlaylist({ onClose, onImported }: ImportPlaylistProps) {
     setIsImporting(true);
     setProgress({ tracks: 0, status: 'Connecting to Spotify...' });
 
-    let meta: { name: string; description?: string; owner?: string; image?: string; trackCount: number } | null = null;
-    const allTracks: ImportedTrack[] = [];
+    const controller = new AbortController();
+    importAbortRef.current = controller;
 
-    const sse = new EventSource(`${config.API_URL}/api/import-playlist?url=${encodeURIComponent(trimmed)}`);
+    try {
+      const playlist = await importOrReuseSpotifyPlaylist({
+        apiUrl: config.API_URL,
+        url: trimmed,
+        signal: controller.signal,
+        onProgress: nextProgress => setProgress(nextProgress),
+      });
 
-    sse.addEventListener('meta', eventData => {
-      meta = JSON.parse(eventData.data);
-      setProgress(prev => ({ ...prev, status: `Importing "${meta?.name}"...` }));
-    });
-
-    sse.addEventListener('tracks', eventData => {
-      const nextTracks: ImportedTrack[] = JSON.parse(eventData.data);
-      allTracks.push(...nextTracks);
-      setProgress({ tracks: allTracks.length, status: `Found ${allTracks.length} tracks...` });
-    });
-
-    sse.addEventListener('done', () => {
-      sse.close();
       setIsImporting(false);
-
-      if (!meta || allTracks.length === 0) {
-        setError('No tracks found. The playlist might be empty or private.');
-        return;
-      }
-
-      const existingPlaylists: ImportedPlaylist[] = JSON.parse(localStorage.getItem('imported_playlists') || '[]');
-      const existingPlaylist = existingPlaylists.find(item =>
-        extractSpotifyPlaylistId(item.sourceUrl) === spotifyPlaylistId
-      );
-
-      const playlist: ImportedPlaylist = {
-        id: existingPlaylist?.id || `imported-${spotifyPlaylistId}`,
-        name: meta.name,
-        description: meta.description,
-        owner: meta.owner,
-        image: meta.image,
-        trackCount: meta.trackCount,
-        tracks: allTracks,
-        sourceUrl: trimmed,
-        importedAt: Date.now(),
-      };
-
-      const updatedPlaylists = existingPlaylist
-        ? existingPlaylists.map(item => (item.id === existingPlaylist.id ? playlist : item))
-        : [...existingPlaylists, playlist];
-
-      localStorage.setItem('imported_playlists', JSON.stringify(updatedPlaylists));
-      window.dispatchEvent(new CustomEvent('playlist-imported', { detail: playlist }));
       onImported(playlist);
-    });
-
-    sse.addEventListener('error', () => {
-      sse.close();
+    } catch (importError) {
+      if (controller.signal.aborted) return;
       setIsImporting(false);
-      setError('Import failed. Please try again.');
-    });
+      setError(importError instanceof Error ? importError.message : 'Import failed. Please try again.');
+    } finally {
+      if (importAbortRef.current === controller) {
+        importAbortRef.current = null;
+      }
+    }
   };
 
   return (

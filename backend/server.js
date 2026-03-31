@@ -1,9 +1,12 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const execFileAsync = promisify(execFile);
 
 // ─── Invidious + Piped Instances for Audio Streaming ──────────────────────────
 const INVIDIOUS_INSTANCES = [
@@ -110,9 +113,9 @@ function setCache(key, data) {
 function extractSpotifyId(value) {
   if (!value) return null;
   const source = String(value);
-  const uriMatch = source.match(/spotify:(?:artist|track):([a-zA-Z0-9]+)/);
+  const uriMatch = source.match(/spotify:(?:artist|track|playlist):([a-zA-Z0-9]+)/);
   if (uriMatch) return uriMatch[1];
-  const urlMatch = source.match(/(?:artist|track)\/([a-zA-Z0-9]+)/);
+  const urlMatch = source.match(/(?:artist|track|playlist)\/([a-zA-Z0-9]+)/);
   if (urlMatch) return urlMatch[1];
   const rawIdMatch = source.match(/^([a-zA-Z0-9]{22})$/);
   return rawIdMatch?.[1] || null;
@@ -138,6 +141,138 @@ async function fetchSpotifyEmbedState(path) {
 
   const nextData = JSON.parse(match[1]);
   return nextData?.props?.pageProps?.state?.data || null;
+}
+
+async function fetchSpotifyArtistPageHtml(artistId) {
+  const cacheKey = `spotify_artist_page_${artistId}`;
+  const cached = getCached(cacheKey);
+  if (cached) return cached;
+
+  const res = await fetch(`https://open.spotify.com/artist/${artistId}`, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml',
+    }
+  });
+
+  if (!res.ok) {
+    throw new Error(`Spotify artist page fetch failed: ${res.status}`);
+  }
+
+  let html = await res.text();
+  if (!/\/playlist\/[A-Za-z0-9]{22}/.test(html)) {
+    const fallbackScript = `
+      const artistId = process.argv[1];
+      const response = await fetch(\`https://r.jina.ai/http://https://open.spotify.com/artist/\${artistId}\`, {
+        headers: { Accept: 'text/plain' }
+      });
+      const text = await response.text();
+      process.stdout.write(text);
+    `;
+    const { stdout: fallbackHtml } = await execFileAsync(process.execPath, ['-e', fallbackScript, artistId], {
+      maxBuffer: 2 * 1024 * 1024,
+    });
+    if (/playlist\/[A-Za-z0-9]{22}/.test(fallbackHtml)) {
+      html = fallbackHtml;
+    }
+  }
+
+  setCache(cacheKey, html);
+  return html;
+}
+
+function decodeHtmlEntities(value) {
+  return String(value || '')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&#x27;/g, '\'')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+async function fetchSpotifyPlaylistCardDetails(playlistId) {
+  const cacheKey = `spotify_playlist_card_${playlistId}`;
+  const cached = getCached(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const playlistData = await fetchSpotifyEmbedState(`playlist/${playlistId}`);
+    const entity = playlistData?.entity;
+    if (!entity || entity.type !== 'playlist') return null;
+
+    const images = (entity.visualIdentity?.image || [])
+      .map(image => image?.url)
+      .filter(Boolean);
+
+    const details = {
+      name: entity.title || entity.name || undefined,
+      image: images[0] || undefined,
+    };
+
+    setCache(cacheKey, details);
+    return details;
+  } catch {
+    return null;
+  }
+}
+
+async function parseArtistPagePlaylists(html) {
+  const source = String(html || '');
+  const anchorMatches = [...source.matchAll(/<a[^>]+href="\/playlist\/([A-Za-z0-9]{22})"[^>]*>([\s\S]{0,4000}?)<\/a>/g)];
+  const markdownMatches = anchorMatches.length
+    ? []
+    : [...source.matchAll(/\[([^\]]+)\]\(https:\/\/open\.spotify\.com\/playlist\/([A-Za-z0-9]{22})\)/g)];
+  const seen = new Set();
+  const playlists = [];
+
+  for (const match of anchorMatches) {
+    const playlistId = match[1];
+    if (!playlistId || seen.has(playlistId)) continue;
+    seen.add(playlistId);
+
+    const anchorHtml = match[2] || '';
+    const spanTexts = [...anchorHtml.matchAll(/<span[^>]*>([^<]+)<\/span>/g)]
+      .map(spanMatch => decodeHtmlEntities(spanMatch[1]))
+      .filter(Boolean);
+    const imageMatch = anchorHtml.match(/<img[^>]+src="([^"]+)"/i);
+
+    playlists.push({
+      id: playlistId,
+      name: spanTexts[0] || '',
+      image: imageMatch?.[1] || undefined,
+      spotifyUrl: `https://open.spotify.com/playlist/${playlistId}`,
+    });
+
+    if (playlists.length >= 6) break;
+  }
+
+  for (const match of markdownMatches) {
+    const playlistId = match[2];
+    if (!playlistId || seen.has(playlistId)) continue;
+    seen.add(playlistId);
+
+    playlists.push({
+      id: playlistId,
+      name: decodeHtmlEntities(match[1]) || '',
+      image: undefined,
+      spotifyUrl: `https://open.spotify.com/playlist/${playlistId}`,
+    });
+
+    if (playlists.length >= 6) break;
+  }
+
+  return Promise.all(playlists.map(async playlist => {
+    if (playlist.name && playlist.image) return playlist;
+
+    const details = await fetchSpotifyPlaylistCardDetails(playlist.id);
+    return {
+      ...playlist,
+      name: playlist.name || details?.name || 'Spotify Playlist',
+      image: playlist.image || details?.image || undefined,
+    };
+  }));
 }
 
 async function resolveArtistId({ artistId, trackId }) {
@@ -995,6 +1130,33 @@ app.get('/api/artist-details', async (req, res) => {
   } catch (e) {
     console.error('Artist details error:', e.message);
     res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/artist-playlists', async (req, res) => {
+  const { artistId, trackId } = req.query;
+  if (!artistId && !trackId) {
+    return res.status(400).json({ error: 'artistId or trackId is required' });
+  }
+
+  try {
+    const resolvedArtistId = await resolveArtistId({ artistId, trackId });
+    if (!resolvedArtistId) {
+      return res.json([]);
+    }
+
+    const cacheKey = `artist_playlists_${resolvedArtistId}`;
+    const cached = getCached(cacheKey);
+    if (cached) return res.json(cached);
+
+    const html = await fetchSpotifyArtistPageHtml(resolvedArtistId);
+    const playlists = await parseArtistPagePlaylists(html);
+
+    setCache(cacheKey, playlists);
+    res.json(playlists);
+  } catch (error) {
+    console.warn('Artist playlists fetch failed:', error.message);
+    res.json([]);
   }
 });
 

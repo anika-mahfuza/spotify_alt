@@ -8,10 +8,11 @@ import { Home } from './components/Home';
 import { SearchBar } from './components/SearchBar';
 import { ResultList } from './components/ResultList';
 import { config } from './config';
-import { Artist, ImportedPlaylist, ImportedTrack, Track } from './types';
+import { Artist, ArtistPlaylist, ImportedPlaylist, ImportedTrack, Track } from './types';
 import { ChevronUp, Music } from 'lucide-react';
 import { applyAlbumTheme, DEFAULT_ALBUM_THEME, extractAlbumTheme } from './utils/colorExtractor';
 import { DynamicBackground } from './components/DynamicBackground';
+import { importOrReuseSpotifyPlaylist } from './utils/spotifyPlaylistImport';
 import './index.css';
 import './App.css';
 import './styles/global.css';
@@ -62,6 +63,36 @@ interface SpotifyTrackDetailsResponse {
   artistIds?: string[];
   image?: string;
   spotifyUrl?: string;
+}
+
+function parseDurationToMs(duration: string): number {
+  const parts = String(duration || '').split(':').map(part => parseInt(part, 10));
+  if (parts.some(Number.isNaN)) return 0;
+  if (parts.length === 2) return (parts[0] * 60 + parts[1]) * 1000;
+  if (parts.length === 3) return (parts[0] * 3600 + parts[1] * 60 + parts[2]) * 1000;
+  return 0;
+}
+
+function importedTrackToPlayableTrack(track: ImportedTrack, index: number, playlistId?: string): Track {
+  const spotifyTrackId = track.spotifyTrackId || extractSpotifyTrackId(track.url);
+  const artistIds = track.artistIds?.filter(Boolean);
+
+  return {
+    id: `${playlistId || 'imported'}-${index}-${track.name.replace(/\s+/g, '-')}`.slice(0, 80),
+    name: track.name,
+    artist: track.artist,
+    album: track.album,
+    duration_ms: parseDurationToMs(track.duration),
+    image: track.image || undefined,
+    artistId: track.artistId || artistIds?.[0],
+    artistIds,
+    spotifyTrackId,
+    spotifyUrl: track.url || undefined,
+  };
+}
+
+function importedPlaylistToPlayableTracks(playlist: ImportedPlaylist): Track[] {
+  return playlist.tracks.map((track, index) => importedTrackToPlayableTrack(track, index, playlist.id));
 }
 
 async function repairImportedPlaylists(apiUrl: string, signal?: AbortSignal): Promise<boolean> {
@@ -610,6 +641,7 @@ function MainContent({
 }
 
 function MainLayout() {
+  const navigate = useNavigate();
   const [isNowPlayingSidebarOpen, setIsNowPlayingSidebarOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -627,6 +659,7 @@ function MainLayout() {
     return enrichTrackWithImportedMetadata(saved ? JSON.parse(saved) : null);
   });
   const [artistDetails, setArtistDetails] = useState<Artist | null>(null);
+  const [artistPlaylists, setArtistPlaylists] = useState<ArtistPlaylist[]>([]);
   const [queue, setQueue] = useState<Track[]>(() => {
     const saved = localStorage.getItem('player_queue');
     return saved ? JSON.parse(saved).map((track: Track) => enrichTrackWithImportedMetadata(track) || track) : [];
@@ -636,6 +669,7 @@ function MainLayout() {
     return saved ? parseInt(saved) : 0;
   });
   const artistDetailsCacheRef = useRef<Map<string, Artist>>(new Map());
+  const artistPlaylistsCacheRef = useRef<Map<string, ArtistPlaylist[]>>(new Map());
   const artistTopTrackQueue = useMemo(() => buildArtistTopTrackQueue(artistDetails), [artistDetails]);
   const artistDetailsLookupKey = currentTrack
     ? (currentTrack.artistId
@@ -727,6 +761,68 @@ function MainLayout() {
       return changed ? next : prev;
     });
   }, []);
+
+  useEffect(() => {
+    if (!currentTrack || currentTrack.isYoutube) {
+      setArtistPlaylists([]);
+      return;
+    }
+
+    const params = new URLSearchParams();
+    if (currentTrack.artistId) {
+      params.set('artistId', currentTrack.artistId);
+    }
+    if (currentTrack.spotifyTrackId) {
+      params.set('trackId', currentTrack.spotifyTrackId);
+    }
+
+    if (!params.toString()) {
+      setArtistPlaylists([]);
+      return;
+    }
+
+    const controller = new AbortController();
+    const cachedArtistPlaylists = artistDetailsLookupKey
+      ? artistPlaylistsCacheRef.current.get(artistDetailsLookupKey)
+      : undefined;
+
+    if (cachedArtistPlaylists) {
+      setArtistPlaylists(cachedArtistPlaylists);
+      return () => {
+        controller.abort();
+      };
+    }
+
+    setArtistPlaylists([]);
+
+    const loadArtistPlaylists = async () => {
+      try {
+        const response = await fetch(`${config.API_URL}/api/artist-playlists?${params.toString()}`, {
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`Artist playlists request failed: ${response.status}`);
+        }
+
+        const data: ArtistPlaylist[] = await response.json();
+        if (artistDetailsLookupKey) {
+          artistPlaylistsCacheRef.current.set(artistDetailsLookupKey, data);
+        }
+        setArtistPlaylists(data);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        console.error('Artist playlists fetch failed', error);
+        setArtistPlaylists([]);
+      }
+    };
+
+    loadArtistPlaylists();
+
+    return () => {
+      controller.abort();
+    };
+  }, [artistDetailsLookupKey, currentTrack]);
 
   useEffect(() => {
     if (!currentTrack || currentTrack.isYoutube) {
@@ -836,6 +932,26 @@ function MainLayout() {
     setCurrentTrack(track);
   }, [artistTopTrackQueue, currentTrack]);
 
+  const handleOpenImportedPlaylist = useCallback(async (playlistCard: ArtistPlaylist, shouldPlay: boolean) => {
+    const playlist = await importOrReuseSpotifyPlaylist({
+      apiUrl: config.API_URL,
+      url: playlistCard.spotifyUrl,
+    });
+
+    if (shouldPlay) {
+      const tracks = importedPlaylistToPlayableTracks(playlist);
+      if (tracks.length > 0) {
+        setQueue(tracks);
+        setCurrentIndex(0);
+        setCurrentTrack(tracks[0]);
+        setIsPlaying(true);
+      }
+    }
+
+    navigate(`/playlist/${playlist.id}`);
+    setIsNowPlayingSidebarOpen(false);
+  }, [navigate]);
+
   return (
     <div className="flex h-screen w-screen text-text-primary overflow-hidden relative bg-bg-base">
       <DynamicBackground currentTrack={currentTrack} />
@@ -859,6 +975,7 @@ function MainLayout() {
         <NowPlayingSidebar
           currentTrack={currentTrack}
           artistDetails={artistDetails}
+          artistPlaylists={artistPlaylists}
           isPlaying={isPlaying}
           onClose={() => setIsNowPlayingSidebarOpen(false)}
           queue={queue}
@@ -866,6 +983,8 @@ function MainLayout() {
           onSelectQueueIndex={handleSelectQueueIndex}
           onRemoveFromQueue={handleRemoveFromQueue}
           onPlayArtistTopTrack={handlePlayArtistTopTrack}
+          onOpenArtistPlaylist={playlist => handleOpenImportedPlaylist(playlist, false)}
+          onPlayArtistPlaylist={playlist => handleOpenImportedPlaylist(playlist, true)}
           width={sidebarWidth}
           setWidth={setSidebarWidth}
         />

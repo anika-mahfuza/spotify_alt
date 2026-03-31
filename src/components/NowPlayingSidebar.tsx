@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ExternalLink, Music, Trash2, X } from 'lucide-react';
-import { Artist, Track } from '../types';
+import { ArrowLeft, ExternalLink, Loader2, Music, Trash2, X } from 'lucide-react';
+import { Artist, ArtistPlaylist, Track } from '../types';
 import { SolidPauseIcon, SolidPlayIcon } from './PlaybackIcons';
 
 interface NowPlayingSidebarProps {
   currentTrack: Track | null;
   artistDetails: Artist | null;
+  artistPlaylists?: ArtistPlaylist[];
   isPlaying: boolean;
   onClose: () => void;
   queue?: Track[];
@@ -13,6 +14,8 @@ interface NowPlayingSidebarProps {
   onSelectQueueIndex?: (index: number) => void;
   onRemoveFromQueue?: (index: number) => void;
   onPlayArtistTopTrack?: (index: number) => void;
+  onOpenArtistPlaylist?: (playlist: ArtistPlaylist) => Promise<void>;
+  onPlayArtistPlaylist?: (playlist: ArtistPlaylist) => Promise<void>;
   width: number;
   setWidth: (width: number) => void;
 }
@@ -20,6 +23,7 @@ interface NowPlayingSidebarProps {
 export function NowPlayingSidebar({
   currentTrack,
   artistDetails,
+  artistPlaylists = [],
   isPlaying,
   onClose,
   queue = [],
@@ -27,6 +31,8 @@ export function NowPlayingSidebar({
   onSelectQueueIndex,
   onRemoveFromQueue,
   onPlayArtistTopTrack,
+  onOpenArtistPlaylist,
+  onPlayArtistPlaylist,
   width,
   setWidth,
 }: NowPlayingSidebarProps) {
@@ -34,6 +40,9 @@ export function NowPlayingSidebar({
   const [isResizing, setIsResizing] = useState(false);
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
   const [hoveredTopTrack, setHoveredTopTrack] = useState<string | null>(null);
+  const [selectedArtistPlaylist, setSelectedArtistPlaylist] = useState<ArtistPlaylist | null>(null);
+  const [playlistAction, setPlaylistAction] = useState<'open' | 'play' | null>(null);
+  const [playlistActionError, setPlaylistActionError] = useState<string | null>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -79,6 +88,12 @@ export function NowPlayingSidebar({
     contentRef.current?.scrollTo({ top: 0, behavior: 'auto' });
   }, [currentTrack?.id, currentTrack?.spotifyTrackId]);
 
+  useEffect(() => {
+    setSelectedArtistPlaylist(null);
+    setPlaylistAction(null);
+    setPlaylistActionError(null);
+  }, [currentTrack?.id, currentTrack?.spotifyTrackId]);
+
   const coverUrl = currentTrack?.image || currentTrack?.thumbnail;
 
   const upcoming = useMemo(() => {
@@ -93,6 +108,25 @@ export function NowPlayingSidebar({
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
+  const handlePlaylistPreviewAction = useCallback(async (action: 'open' | 'play') => {
+    if (!selectedArtistPlaylist) return;
+
+    setPlaylistAction(action);
+    setPlaylistActionError(null);
+
+    try {
+      if (action === 'open') {
+        await onOpenArtistPlaylist?.(selectedArtistPlaylist);
+      } else {
+        await onPlayArtistPlaylist?.(selectedArtistPlaylist);
+      }
+    } catch (error) {
+      setPlaylistActionError(error instanceof Error ? error.message : 'Playlist action failed.');
+    } finally {
+      setPlaylistAction(null);
+    }
+  }, [onOpenArtistPlaylist, onPlayArtistPlaylist, selectedArtistPlaylist]);
+
   return (
     <>
       {!isDesktop ? (
@@ -101,7 +135,7 @@ export function NowPlayingSidebar({
 
       <div
         ref={sidebarRef}
-        className={`fixed right-0 top-0 z-[60] flex h-screen flex-col border-l border-border/60 bg-bg-primary/34 p-5 shadow-[0_24px_70px_rgba(0,0,0,0.22)] backdrop-blur-3xl lg:static ${isResizing ? 'select-none' : ''}`}
+        className={`fixed right-0 top-0 z-[60] relative flex h-screen flex-col border-l border-border/60 bg-bg-primary/34 p-5 shadow-[0_24px_70px_rgba(0,0,0,0.22)] backdrop-blur-3xl lg:static ${isResizing ? 'select-none' : ''}`}
         style={{
           width: isDesktop ? `${width}px` : '90%',
           maxWidth: isDesktop ? undefined : '480px',
@@ -192,6 +226,45 @@ export function NowPlayingSidebar({
                     </p>
                   </div>
                 ) : null}
+              </div>
+            ) : null}
+
+            {artistPlaylists.length ? (
+              <div className="mt-6 rounded-[24px] app-panel p-4">
+                <div className="mb-4">
+                  <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-text-muted">Artist playlists</h4>
+                  <p className="mt-1 text-xs text-text-secondary">From Spotify artist page</p>
+                </div>
+
+                <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2">
+                  {artistPlaylists.map(playlist => (
+                    <button
+                      key={playlist.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedArtistPlaylist(playlist);
+                        setPlaylistAction(null);
+                        setPlaylistActionError(null);
+                      }}
+                      className="w-[132px] shrink-0 text-left"
+                    >
+                      <div className="rounded-[18px] app-card app-card-hover p-2.5">
+                        {playlist.image ? (
+                          <img
+                            src={playlist.image}
+                            alt={playlist.name}
+                            className="aspect-square w-full rounded-[14px] object-cover"
+                          />
+                        ) : (
+                          <div className="flex aspect-square w-full items-center justify-center rounded-[14px] bg-bg-secondary">
+                            <Music size={20} className="text-text-muted" />
+                          </div>
+                        )}
+                        <p className="mt-2 line-clamp-2 text-xs font-medium leading-5 text-text-primary">{playlist.name}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
             ) : null}
 
@@ -348,6 +421,82 @@ export function NowPlayingSidebar({
             <p className="text-sm text-text-secondary">No song is currently playing.</p>
           </div>
         )}
+
+        {selectedArtistPlaylist ? (
+          <div className="absolute inset-0 z-20 flex flex-col bg-bg-primary/78 backdrop-blur-2xl">
+            <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedArtistPlaylist(null);
+                  setPlaylistAction(null);
+                  setPlaylistActionError(null);
+                }}
+                className="app-button-secondary inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-medium"
+              >
+                <ArrowLeft size={14} />
+                Back
+              </button>
+
+              <a
+                href={selectedArtistPlaylist.spotifyUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="app-button-secondary inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-medium"
+                title="Open playlist in Spotify"
+              >
+                <ExternalLink size={12} />
+                Spotify
+              </a>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-5 py-5">
+              <div className="overflow-hidden rounded-[26px] app-panel shadow-elevated">
+                {selectedArtistPlaylist.image ? (
+                  <img src={selectedArtistPlaylist.image} alt={selectedArtistPlaylist.name} className="aspect-square w-full object-cover" />
+                ) : (
+                  <div className="flex aspect-square w-full items-center justify-center bg-bg-secondary">
+                    <Music size={44} className="text-text-muted" />
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-text-muted">Artist playlist</p>
+                <h4 className="mt-2 text-2xl font-bold leading-tight text-text-primary">{selectedArtistPlaylist.name}</h4>
+                <p className="mt-2 text-sm leading-6 text-text-secondary">
+                  Open the full playlist page in the app or start playing it from track 1.
+                </p>
+              </div>
+
+              {playlistActionError ? (
+                <p className="mt-4 text-sm text-danger">{playlistActionError}</p>
+              ) : null}
+
+              <div className="mt-6 space-y-3">
+                <button
+                  type="button"
+                  onClick={() => handlePlaylistPreviewAction('open')}
+                  disabled={playlistAction !== null}
+                  className="app-button-primary flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold disabled:opacity-70"
+                >
+                  {playlistAction === 'open' ? <Loader2 size={16} className="animate-spin" /> : null}
+                  {playlistAction === 'open' ? 'Opening playlist...' : 'Open playlist'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handlePlaylistPreviewAction('play')}
+                  disabled={playlistAction !== null}
+                  className="app-button-secondary flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold disabled:opacity-70"
+                >
+                  {playlistAction === 'play' ? <Loader2 size={16} className="animate-spin" /> : null}
+                  {playlistAction === 'play' ? 'Starting playback...' : 'Play now'}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </>
   );

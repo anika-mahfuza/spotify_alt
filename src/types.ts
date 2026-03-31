@@ -74,6 +74,13 @@ export interface Artist {
   }>;
 }
 
+export interface ArtistPlaylist {
+  id: string;
+  name: string;
+  image?: string;
+  spotifyUrl: string;
+}
+
 export interface SimplifiedArtist {
   id: string;
   name: string;
