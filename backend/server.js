@@ -162,12 +162,17 @@ async function fetchSpotifyArtistPageHtml(artistId) {
   let html = await res.text();
   if (!/\/playlist\/[A-Za-z0-9]{22}/.test(html)) {
     const fallbackScript = `
-      const artistId = process.argv[1];
-      const response = await fetch(\`https://r.jina.ai/http://https://open.spotify.com/artist/\${artistId}\`, {
-        headers: { Accept: 'text/plain' }
+      (async () => {
+        const artistId = process.argv[1];
+        const response = await fetch(\`https://r.jina.ai/http://https://open.spotify.com/artist/\${artistId}\`, {
+          headers: { Accept: 'text/plain' }
+        });
+        const text = await response.text();
+        process.stdout.write(text);
+      })().catch(error => {
+        console.error(error instanceof Error ? error.message : String(error));
+        process.exit(1);
       });
-      const text = await response.text();
-      process.stdout.write(text);
     `;
     const { stdout: fallbackHtml } = await execFileAsync(process.execPath, ['-e', fallbackScript, artistId], {
       maxBuffer: 2 * 1024 * 1024,
