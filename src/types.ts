@@ -22,6 +22,7 @@ export interface ImportedTrack {
   album: string;
   image: string;
   duration: string;
+  durationMs?: number;
   url: string;
   artistId?: string;
   artistIds?: string[];

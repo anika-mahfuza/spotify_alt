@@ -341,6 +341,7 @@ export function Player({
         const trackParams: Record<string, string | undefined> = {
             title: track.name,
             artist: track.artist,
+            durationMs: track.duration_ms ? String(track.duration_ms) : undefined,
         };
 
         for (const query of queries) {

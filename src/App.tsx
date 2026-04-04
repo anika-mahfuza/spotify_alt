@@ -82,7 +82,7 @@ function importedTrackToPlayableTrack(track: ImportedTrack, index: number, playl
     name: track.name,
     artist: track.artist,
     album: track.album,
-    duration_ms: parseDurationToMs(track.duration),
+    duration_ms: track.durationMs || parseDurationToMs(track.duration),
     image: track.image || undefined,
     artistId: track.artistId || artistIds?.[0],
     artistIds,

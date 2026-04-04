@@ -26,6 +26,8 @@ const PIPED_INSTANCES = [
 
 // ─── Spotify GraphQL API Config ───────────────────────────────────────────────
 const SPOTIFY_PATHFINDER = 'https://api-partner.spotify.com/pathfinder/v1/query';
+const SPOTIFY_PATHFINDER_V2 = 'https://api-partner.spotify.com/pathfinder/v2/query';
+const SPOTIFY_SPCLIENT = 'https://spclient.wg.spotify.com';
 const SPOTIFY_PAGE_LIMIT = 100;
 
 // ─── Dynamic Hash Management ──────────────────────────────────────────────────
@@ -46,9 +48,14 @@ async function fetchSpotifyHash() {
     if (!pageRes.ok) throw new Error(`Page fetch failed: ${pageRes.status}`);
     const html = await pageRes.text();
 
-    // Find web-player bundle URLs
-    const bundleUrls = [...html.matchAll(/src="(https:\/\/open\.spotifycdn\.com\/cdn\/build\/web-player\/[^"]+)"/g)]
-      .map(m => m[1]);
+    // Find web-player bundle URLs (multiple patterns)
+    const bundleUrls = new Set();
+    for (const match of html.matchAll(/src="(https:\/\/open\.spotifycdn\.com\/cdn\/build\/web-player\/[^"]+)"/g)) {
+      bundleUrls.add(match[1]);
+    }
+    for (const match of html.matchAll(/src="(https:\/\/[^\s"]*\/xpui[^"\s]*\.js)"/g)) {
+      bundleUrls.add(match[1]);
+    }
 
     for (const url of bundleUrls) {
       try {
@@ -57,9 +64,16 @@ async function fetchSpotifyHash() {
         const js = await bundleRes.text();
 
         // Look for pattern: "fetchPlaylist","query","HASH" or similar
-        const match = js.match(/"fetchPlaylist"[^"]*"query"[^"]*"([a-f0-9]{64})"/);
+        let match = js.match(/"fetchPlaylist"[^"]*"query"[^"]*"([a-f0-9]{64})"/);
         if (match) {
           console.log(`[Hash] Extracted new hash: ${match[1]}`);
+          return match[1];
+        }
+
+        // Also try: operationName:"fetchPlaylist"...sha256Hash:"HASH"
+        match = js.match(/["']operationName["']\s*:\s*["']fetchPlaylist["'][^]{0,1000}["']sha256Hash["']\s*:\s*["']([a-f0-9]{64})["']/);
+        if (match) {
+          console.log(`[Hash] Extracted new hash (pattern 2): ${match[1]}`);
           return match[1];
         }
       } catch { continue; }
@@ -757,6 +771,16 @@ function scoreResult(result, query, context = {}) {
   if (artist.includes('topic')) score += 20;
   if (artist.includes('vevo')) score += 16;
 
+  // Precise duration match against Spotify's known duration
+  const spotifyDurationMs = Number(context.durationMs) || 0;
+  if (spotifyDurationMs > 0 && durationMs > 0) {
+    const diffSec = Math.abs(durationMs - spotifyDurationMs) / 1000;
+    if (diffSec <= 2)       score += 80;
+    else if (diffSec <= 8)  score += 45;
+    else if (diffSec <= 20) score += 15;
+    else if (diffSec > 60)  score -= 100;
+  }
+
   return score;
 }
 
@@ -998,6 +1022,7 @@ function parseGraphQLTracks(items) {
       album,
       image,
       duration: msToTime(durationMs),
+      durationMs: durationMs,
       url: spotifyTrackId ? `https://open.spotify.com/track/${spotifyTrackId}` : '#',
       artistId: artistItems[0]?.id || undefined,
       artistIds: artistItems.map(artist => artist.id).filter(Boolean),
@@ -1089,6 +1114,188 @@ app.get('/api/import-playlist', async (req, res) => {
 //  YOUTUBE SEARCH & STREAMING ENDPOINTS
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════════════════════════════
+//  SPOTIFY DATA ENDPOINTS (Artist, Playlist, Track)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── Helper: Get anonymous token from embed page ──────────────────────────────
+async function getAnonymousSpotifyToken() {
+  const cacheKey = 'spotify_anon_token';
+  const cached = getCached(cacheKey);
+  if (cached) return cached;
+
+  const res = await fetch('https://open.spotify.com/embed/playlist/37i9dQZF1DXcBWIGoYBM5M', {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml',
+    }
+  });
+  if (!res.ok) throw new Error(`Token fetch failed: ${res.status}`);
+  const html = await res.text();
+  const match = html.match(/<script\s+id="__NEXT_DATA__"[^>]*>(.*?)<\/script>/s);
+  if (!match) throw new Error('Could not extract __NEXT_DATA__');
+  const nextData = JSON.parse(match[1]);
+  const token = nextData?.props?.pageProps?.state?.settings?.session?.accessToken;
+  if (!token) throw new Error('Could not extract accessToken');
+  setCache(cacheKey, token);
+  return token;
+}
+
+// ─── Playlist Extender (Spotify's native recommendation API) ──────────────────
+// Returns scored, related tracks for a playlist context. This is what the
+// official desktop app uses to show "related songs" when playing a track.
+// Far better than scraping artist pages — returns tracks ranked by relevance.
+async function fetchPlaylistExtender(playlistUri, numResults = 20, trackSkipIds = []) {
+  const cacheKey = `playlist_extender_${playlistUri}_${numResults}`;
+  const cached = getCached(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const token = await getAnonymousSpotifyToken();
+    const body = JSON.stringify({
+      playlistURI: playlistUri,
+      trackSkipIDs: trackSkipIds,
+      numResults: numResults,
+    });
+
+    const res = await fetch(`${SPOTIFY_SPCLIENT}/playlistextender/extendp/`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json;charset=UTF-8',
+        'Accept': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'App-Platform': 'WebPlayer',
+      },
+      body,
+    });
+
+    if (!res.ok) {
+      throw new Error(`Playlist extender failed: ${res.status}`);
+    }
+
+    const text = await res.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      // Response might be base64-encoded
+      const decoded = Buffer.from(text, 'base64').toString('utf8');
+      data = JSON.parse(decoded);
+    }
+
+    const tracks = (data.recommendedTracks || []).map(t => ({
+      id: t.originalId ? extractSpotifyId(t.originalId) : t.id,
+      name: t.name || 'Unknown',
+      artist: t.artists?.map(a => a.name).join(', ') || 'Unknown',
+      artistIds: t.artists?.map(a => a.id).filter(Boolean) || [],
+      album: t.album?.name || 'Unknown',
+      image: t.album?.largeImageUrl || t.album?.imageUrl || undefined,
+      duration_ms: t.duration || 0,
+      popularity: t.popularity || 0,
+      explicit: t.explicit || false,
+      score: t.score || 0,
+      spotifyUrl: t.originalId ? `https://open.spotify.com/${t.originalId.replace('spotify:', '').replace(':', '/')}` : undefined,
+    }));
+
+    setCache(cacheKey, tracks);
+    return tracks;
+  } catch (e) {
+    console.warn('[Extender] Failed:', e.message);
+    return [];
+  }
+}
+
+// ─── Track Metadata API (fast structured JSON) ────────────────────────────────
+// Uses spclient.wg.spotify.com/metadata/4/track/{gid} for faster track details
+// instead of scraping embed pages. Returns GID-based data directly.
+async function fetchTrackMetadata(trackGid) {
+  const cacheKey = `track_metadata_${trackGid}`;
+  const cached = getCached(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const token = await getAnonymousSpotifyToken();
+    const res = await fetch(`${SPOTIFY_SPCLIENT}/metadata/4/track/${trackGid}?market=from_token`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'App-Platform': 'WebPlayer',
+      }
+    });
+
+    if (!res.ok) throw new Error(`Metadata fetch failed: ${res.status}`);
+    const data = await res.json();
+
+    const result = {
+      gid: data.gid,
+      name: data.name,
+      artist: data.artist?.[0]?.name,
+      artistIds: data.artist?.map(a => a.gid).filter(Boolean) || [],
+      album: data.album?.name,
+      albumId: data.album?.gid,
+      image: data.album?.cover_group?.image?.find(i => i.size === 'LARGE')?.file_id
+        ? `https://i.scdn.co/image/ab67616d0000b273${data.album.cover_group.image.find(i => i.size === 'LARGE').file_id.replace('ab67616d0000b273', '')}`
+        : undefined,
+      duration_ms: data.duration,
+      popularity: data.popularity,
+      explicit: data.explicit || false,
+      has_lyrics: data.has_lyrics,
+      canonical_uri: data.canonical_uri,
+      isrc: data.external_id?.find(e => e.type === 'isrc')?.id,
+    };
+
+    // Fix image URL: file_id already includes the prefix
+    if (data.album?.cover_group?.image) {
+      const largeImg = data.album.cover_group.image.find(i => i.size === 'LARGE');
+      if (largeImg?.file_id) {
+        result.image = `https://i.scdn.co/image/${largeImg.file_id}`;
+      }
+    }
+
+    setCache(cacheKey, result);
+    return result;
+  } catch (e) {
+    console.warn('[Metadata] Failed:', e.message);
+    return null;
+  }
+}
+
+// ─── GraphQL v2 Helper ────────────────────────────────────────────────────────
+async function fetchGraphQLV2(operationName, variables) {
+  try {
+    const token = await getAnonymousSpotifyToken();
+    const hash = await getHash();
+
+    const body = {
+      operationName,
+      variables,
+      extensions: {
+        persistedQuery: { version: 1, sha256Hash: hash }
+      }
+    };
+
+    const res = await fetch(SPOTIFY_PATHFINDER_V2, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'App-Platform': 'WebPlayer',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (e) {
+    console.warn('[GraphQL v2] Failed:', e.message);
+    return null;
+  }
+}
+
 app.get('/api/artist-details', async (req, res) => {
   const { artistId, trackId } = req.query;
   if (!artistId && !trackId) {
@@ -1176,6 +1383,8 @@ app.get('/api/track-details', async (req, res) => {
     const cached = getCached(cacheKey);
     if (cached) return res.json(cached);
 
+    // Try metadata API first (faster, structured JSON)
+    // We need the GID, so try embed page first to get it
     const trackData = await fetchSpotifyEmbedState(`track/${normalizedTrackId}`);
     const details = parseTrackEmbedDetails(trackData?.entity);
     if (!details) {
@@ -1207,14 +1416,14 @@ app.get('/api/track-details', async (req, res) => {
 });
 
 app.get('/api/best-match', async (req, res) => {
-  const { q, title, artist } = req.query;
+  const { q, title, artist, durationMs } = req.query;
   if (!q) return res.status(400).json({ error: 'Query required' });
   try {
-    const cacheKey = `best_match_${String(q).toLowerCase().trim()}__${normalizeSongQuery(title)}__${normalizeSongQuery(artist)}`;
+    const cacheKey = `best_match_${String(q).toLowerCase().trim()}__${normalizeSongQuery(title)}__${normalizeSongQuery(artist)}__${durationMs || ''}`;
     const cached = getCached(cacheKey);
     if (cached) return res.json(cached);
 
-    const searchContext = { title, artist };
+    const searchContext = { title, artist, durationMs };
     const results = await doSearch(q, searchContext);
     if (!results.length) return res.status(404).json({ error: 'No results found' });
 
