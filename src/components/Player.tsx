@@ -674,20 +674,23 @@ export function Player({
 
     const secondaryControlClass = 'text-text-secondary hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-45 transition-colors';
     const activeControlClass = 'text-primary hover:text-primary-hover disabled:cursor-not-allowed disabled:opacity-45 transition-colors';
+    const visibleVideoWidth = isLargeScreen
+        ? (isSidebarOpen
+            ? `min(420px, calc(100vw - ${sidebarWidth + 72}px))`
+            : 'min(420px, calc(100vw - 3rem))')
+        : 'min(380px, calc(100vw - 2rem))';
     const videoPanelStyle = showVideo
         ? {
             position: 'fixed' as const,
             bottom: isLargeScreen ? '96px' : 'calc(152px + env(safe-area-inset-bottom))',
-            left: isLargeScreen ? 'auto' : '16px',
+            left: 'auto',
             right: isLargeScreen
                 ? (isSidebarOpen ? `${sidebarWidth + 24}px` : '24px')
                 : '16px',
-            width: isLargeScreen
-                ? (isSidebarOpen
-                    ? `min(520px, calc(100vw - ${sidebarWidth + 72}px))`
-                    : 'min(520px, calc(100vw - 3rem))')
-                : 'calc(100vw - 2rem)',
-            height: isLargeScreen ? '328px' : 'min(42vh, 280px)',
+            width: visibleVideoWidth,
+            height: isLargeScreen ? '300px' : '220px',
+            maxWidth: 'calc(100vw - 2rem)',
+            maxHeight: isLargeScreen ? 'calc(100vh - 10rem)' : 'calc(100vh - 12rem)',
             zIndex: 95,
         }
         : {
