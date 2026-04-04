@@ -578,6 +578,78 @@ function fmt(ms) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
+function mapPipedResults(items) {
+  return (items || [])
+    .filter(item => item?.url?.startsWith('/watch?v=') && item?.title)
+    .slice(0, 25)
+    .map(item => {
+      const id = String(item.url).replace('/watch?v=', '');
+      const durationMs = Math.max(0, Number(item.duration) || 0) * 1000;
+
+      return {
+        id,
+        title: item.title,
+        artist: item.uploaderName || 'Unknown',
+        duration: fmt(durationMs),
+        durationMs,
+        thumbnail: item.thumbnail || `https://i.ytimg.com/vi/${id}/mqdefault.jpg`
+      };
+    });
+}
+
+function mapInnertubeSongResults(items) {
+  return (items || [])
+    .filter(item => item?.id && item?.title)
+    .slice(0, 25)
+    .map(item => {
+      const durationMs = Math.max(0, Number(item.duration?.seconds) || 0) * 1000;
+
+      return {
+        id: item.id,
+        title: item.title,
+        artist: item.artists?.map(artist => artist?.name).filter(Boolean).join(', ') || item.author?.name || 'Unknown',
+        duration: item.duration?.text || fmt(durationMs),
+        durationMs,
+        thumbnail: item.thumbnails?.[0]?.url || `https://i.ytimg.com/vi/${item.id}/mqdefault.jpg`
+      };
+    });
+}
+
+async function searchWithInnertube(query) {
+  const yt = await getInnertube();
+  const search = await yt.music.search(query, { type: 'song' });
+  const mapped = mapInnertubeSongResults(search?.songs?.contents);
+
+  if (mapped.length) {
+    return mapped;
+  }
+
+  throw new Error('No YouTube Music song results');
+}
+
+async function searchWithPiped(query) {
+  for (const base of PIPED_INSTANCES) {
+    try {
+      const res = await fetch(`${base}/search?q=${encodeURIComponent(query)}&filter=videos`, {
+        signal: AbortSignal.timeout(7000),
+        headers: { 'User-Agent': 'Mozilla/5.0' }
+      });
+
+      if (!res.ok) continue;
+
+      const data = await res.json();
+      const mapped = mapPipedResults(data?.items);
+      if (mapped.length) {
+        return mapped;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  throw new Error('All Piped search instances failed');
+}
+
 function mapResults(results) {
   return (results || []).filter(v => v.id && v.title).slice(0, 25).map(v => ({
     id: v.id,
@@ -790,20 +862,35 @@ async function doSearch(q, context = {}) {
   const merged = new Map();
 
   for (const [index, searchQuery] of searchQueries.entries()) {
+    let mapped = [];
+
     try {
       const results = await yt.search(searchQuery, { limit: 12, type: 'video', safeSearch: false });
-      const mapped = mapResults(results);
-      const sourceBoost = Math.max(0, 10 - index * 2);
-
-      for (const result of mapped) {
-        const mergedScore = scoreResult(result, q, context) + sourceBoost;
-        const existing = merged.get(result.id);
-        if (!existing || mergedScore > existing._score) {
-          merged.set(result.id, { ...result, _score: mergedScore });
-        }
-      }
+      mapped = mapResults(results);
     } catch (e) {
       console.warn(`[Search] Query failed for "${searchQuery}":`, e.message);
+
+      try {
+        mapped = await searchWithInnertube(searchQuery);
+      } catch (fallbackError) {
+        console.warn(`[Search] YouTube Music fallback failed for "${searchQuery}":`, fallbackError.message);
+
+        try {
+          mapped = await searchWithPiped(searchQuery);
+        } catch (pipedError) {
+          console.warn(`[Search] Piped fallback failed for "${searchQuery}":`, pipedError.message);
+        }
+      }
+    }
+
+    const sourceBoost = Math.max(0, 10 - index * 2);
+
+    for (const result of mapped) {
+      const mergedScore = scoreResult(result, q, context) + sourceBoost;
+      const existing = merged.get(result.id);
+      if (!existing || mergedScore > existing._score) {
+        merged.set(result.id, { ...result, _score: mergedScore });
+      }
     }
   }
 
