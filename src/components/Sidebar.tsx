@@ -127,7 +127,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       ) : null}
 
       <div
-        className={`fixed inset-y-0 left-0 z-[260] flex w-72 flex-col border-r border-border/60 bg-bg-primary/46 shadow-[0_20px_50px_rgba(0,0,0,0.18)] backdrop-blur-3xl transition-transform duration-300 md:static md:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        className={`fixed inset-y-0 left-0 z-[260] flex w-72 flex-col border-r border-border/50 bg-bg-primary/22 shadow-[0_20px_50px_rgba(0,0,0,0.1)] backdrop-blur-2xl transition-transform duration-300 md:static md:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
         style={{ height: 'calc(100vh - 6rem)' }}
       >
         <div className="flex items-center justify-between px-4 pb-3 pt-4">

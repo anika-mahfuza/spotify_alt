@@ -532,7 +532,7 @@ function MainContent({
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden relative z-10">
-      <div className="sticky top-0 z-20 px-4 py-4 md:px-6 border-b border-border/60 bg-bg-primary/45 backdrop-blur-3xl shadow-[0_12px_30px_rgba(0,0,0,0.14)]">
+      <div className="sticky top-0 z-20 px-4 py-4 md:px-6 border-b border-border/50 bg-bg-primary/18 backdrop-blur-xl shadow-[0_12px_30px_rgba(0,0,0,0.08)]">
         <SearchBar
           value={searchQuery}
           onChange={(val) => {

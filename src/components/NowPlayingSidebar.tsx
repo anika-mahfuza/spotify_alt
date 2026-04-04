@@ -135,7 +135,7 @@ export function NowPlayingSidebar({
 
       <div
         ref={sidebarRef}
-        className={`fixed right-0 top-0 z-[60] relative flex h-screen flex-col border-l border-border/60 bg-bg-primary/34 p-5 shadow-[0_24px_70px_rgba(0,0,0,0.22)] backdrop-blur-3xl lg:static ${isResizing ? 'select-none' : ''}`}
+        className={`fixed right-0 top-0 z-[60] relative flex h-screen flex-col border-l border-border/50 bg-bg-primary/22 p-5 shadow-[0_24px_70px_rgba(0,0,0,0.14)] backdrop-blur-2xl lg:static ${isResizing ? 'select-none' : ''}`}
         style={{
           width: isDesktop ? `${width}px` : '90%',
           maxWidth: isDesktop ? undefined : '480px',
@@ -423,7 +423,7 @@ export function NowPlayingSidebar({
         )}
 
         {selectedArtistPlaylist ? (
-          <div className="absolute inset-0 z-20 flex flex-col bg-bg-primary/78 backdrop-blur-2xl">
+          <div className="absolute inset-0 z-20 flex flex-col bg-bg-primary/62 backdrop-blur-xl">
             <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
               <button
                 type="button"

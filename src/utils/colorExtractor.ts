@@ -259,7 +259,7 @@ const buildThemeFromColors = (accentSource: RgbColor, supportSource?: RgbColor |
     accentForeground: rgbToHex(accentForeground),
     surfaceTint: rgbToHex(surfaceTint),
     supportDark: rgbToHex(supportDark),
-    heroGradient: `linear-gradient(180deg, ${toRgbaString(heroTop, 0.92)} 0%, ${toRgbaString(heroMid, 0.54)} 48%, ${toRgbaString(supportDark, 0)} 100%)`,
+    heroGradient: `linear-gradient(180deg, ${toRgbaString(heroTop, 0.54)} 0%, ${toRgbaString(heroMid, 0.24)} 48%, ${toRgbaString(supportDark, 0.02)} 100%)`,
     accentRgb: toRgbVar(accent),
     accentHoverRgb: toRgbVar(accentHover),
     accentForegroundRgb: toRgbVar(accentForeground),

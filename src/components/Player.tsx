@@ -659,7 +659,7 @@ export function Player({
                     z-[100]
                     flex min-h-[128px] flex-col justify-end
                     border-t border-border/70
-                    bg-bg-primary/44 backdrop-blur-3xl
+                    bg-bg-primary/24 backdrop-blur-2xl
                     shadow-player
                     md:h-24 md:min-h-0
                 "

@@ -33,8 +33,8 @@ export function DynamicBackground({ currentTrack }: DynamicBackgroundProps) {
     backgroundImage: img ? `url(${img})` : 'none',
     backgroundSize: 'cover',
     backgroundPosition: 'center',
-    filter: 'blur(24px) saturate(1.18) brightness(0.64)',
-    transform: 'scale(1.1)',
+    filter: 'blur(14px) saturate(1.12) brightness(0.8)',
+    transform: 'scale(1.06)',
   });
 
   return (
@@ -46,7 +46,7 @@ export function DynamicBackground({ currentTrack }: DynamicBackgroundProps) {
           className="absolute inset-0 transition-opacity duration-1000 ease-in-out"
           style={{
             ...getStyle(prevImage),
-            opacity: isTransitioning ? 0 : 0.76,
+            opacity: isTransitioning ? 0 : 0.84,
           }}
         />
       ) : null}
@@ -56,7 +56,7 @@ export function DynamicBackground({ currentTrack }: DynamicBackgroundProps) {
           className="absolute inset-0 transition-opacity duration-1000 ease-in-out"
           style={{
             ...getStyle(image),
-            opacity: 0.76,
+            opacity: 0.88,
           }}
         />
       ) : null}
@@ -64,21 +64,21 @@ export function DynamicBackground({ currentTrack }: DynamicBackgroundProps) {
       <div
         className="absolute inset-0"
         style={{
-          background: 'linear-gradient(180deg, rgb(var(--support-dark-rgb) / 0.48) 0%, rgb(var(--app-bg-rgb) / 0.22) 40%, rgb(var(--app-bg-rgb) / 0.68) 100%)',
+          background: 'linear-gradient(180deg, rgb(var(--support-dark-rgb) / 0.2) 0%, rgb(var(--app-bg-rgb) / 0.08) 38%, rgb(var(--app-bg-rgb) / 0.38) 100%)',
         }}
       />
 
       <div
         className="absolute inset-0"
         style={{
-          background: 'radial-gradient(circle at top center, rgb(var(--surface-tint-rgb) / 0.28) 0%, transparent 48%)',
+          background: 'radial-gradient(circle at top center, rgb(var(--surface-tint-rgb) / 0.18) 0%, transparent 52%)',
         }}
       />
 
       <div
         className="absolute inset-0"
         style={{
-          background: 'radial-gradient(circle at center, transparent 0%, rgb(var(--app-bg-rgb) / 0.16) 54%, rgb(var(--app-bg-rgb) / 0.78) 100%)',
+          background: 'radial-gradient(circle at center, transparent 0%, rgb(var(--app-bg-rgb) / 0.08) 56%, rgb(var(--app-bg-rgb) / 0.46) 100%)',
         }}
       />
     </div>
