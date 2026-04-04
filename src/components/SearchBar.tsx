@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { Home, Menu, Search, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { APP_HOME_ROUTE } from '../routes';
 
 interface SearchBarProps {
   onSearch: (query: string) => void;
@@ -67,7 +68,7 @@ export const SearchBar = ({ onSearch, isLoading, value, onChange, showHomeButton
 
         {showHomeButton ? (
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate(APP_HOME_ROUTE)}
             className="app-icon-button hidden h-11 w-11 items-center justify-center rounded-full sm:flex"
             title="Home"
           >

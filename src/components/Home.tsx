@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 
 import { Clock, Disc, Music, Plus, Search as SearchIcon, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ImportedPlaylist, ImportedTrack, Track } from '../types';
+import { buildAppPlaylistRoute } from '../routes';
 import { ImportPlaylist } from './ImportPlaylist';
 import { SolidPauseIcon, SolidPlayIcon } from './PlaybackIcons';
 
@@ -244,7 +245,7 @@ export function Home({ activePlaylistId, onTrackSelect, currentTrack, isPlaying,
 
   const handleImported = (importedPlaylist: ImportedPlaylist) => {
     setShowImport(false);
-    navigate(`/playlist/${importedPlaylist.id}`);
+    navigate(buildAppPlaylistRoute(importedPlaylist.id));
   };
 
   return (
@@ -305,11 +306,11 @@ export function Home({ activePlaylistId, onTrackSelect, currentTrack, isPlaying,
                     <div
                       key={item.id}
                       className="app-card app-card-hover group w-full max-w-[304px] self-start rounded-[16px] p-2.5 text-left"
-                      onClick={() => navigate(`/playlist/${item.id}`)}
+                      onClick={() => navigate(buildAppPlaylistRoute(item.id))}
                       onKeyDown={(event) => {
                         if (event.key === 'Enter' || event.key === ' ') {
                           event.preventDefault();
-                          navigate(`/playlist/${item.id}`);
+                          navigate(buildAppPlaylistRoute(item.id));
                         }
                       }}
                       role="button"

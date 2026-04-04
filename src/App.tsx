@@ -1,13 +1,15 @@
 import { useState, useEffect, useRef, useCallback, useMemo, type Dispatch, type SetStateAction } from 'react';
-import { BrowserRouter as Router, Routes, Route, useMatch, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Navigate, Routes, Route, useMatch, useLocation, useNavigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { Sidebar } from './components/Sidebar';
 import { NowPlayingSidebar } from './components/NowPlayingSidebar';
 import { Player } from './components/Player';
 import { Home } from './components/Home';
+import { LandingPage } from './components/LandingPage';
 import { SearchBar } from './components/SearchBar';
 import { ResultList } from './components/ResultList';
 import { config } from './config';
+import { APP_HOME_ROUTE, APP_PLAYLIST_ROUTE, LANDING_ROUTE, buildAppPlaylistRoute, normalizeAppPath } from './routes';
 import { Artist, ArtistPlaylist, ImportedPlaylist, ImportedTrack, Track } from './types';
 import { ChevronUp, Music } from 'lucide-react';
 import { applyAlbumTheme, DEFAULT_ALBUM_THEME, extractAlbumTheme } from './utils/colorExtractor';
@@ -300,7 +302,7 @@ function MainContent({
   const replayNonceRef = useRef(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  const matchPlaylist = useMatch('/playlist/:id');
+  const matchPlaylist = useMatch(APP_PLAYLIST_ROUTE);
   const location = useLocation();
   const navigate = useNavigate();
   const activePlaylistId = matchPlaylist?.params.id || null;
@@ -309,15 +311,16 @@ function MainContent({
   useEffect(() => {
     if (didRestoreLastPath.current) return;
     didRestoreLastPath.current = true;
-    const savedPath = localStorage.getItem('last_visited_path');
-    if (savedPath && savedPath !== '/' && location.pathname === '/') {
+    const savedPath = normalizeAppPath(localStorage.getItem('last_visited_path'));
+    if (savedPath && savedPath !== APP_HOME_ROUTE && location.pathname === APP_HOME_ROUTE) {
       navigate(savedPath, { replace: true });
     }
   }, [location.pathname, navigate]);
 
   useEffect(() => {
-    if (location.pathname !== '/login' && location.pathname !== '/logout') {
-      localStorage.setItem('last_visited_path', location.pathname);
+    const appPath = normalizeAppPath(location.pathname);
+    if (appPath) {
+      localStorage.setItem('last_visited_path', appPath);
     }
   }, [location.pathname]);
 
@@ -680,6 +683,16 @@ function MainLayout() {
   const openMobileMenu = useCallback(() => setIsMobileMenuOpen(true), []);
   const closeMobileMenu = useCallback(() => setIsMobileMenuOpen(false), []);
 
+  useEffect(() => {
+    document.title = 'Brokeify';
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      applyAlbumTheme(DEFAULT_ALBUM_THEME);
+    };
+  }, []);
+
   // Extract colors from current track
   useEffect(() => {
     let ignore = false;
@@ -947,7 +960,7 @@ function MainLayout() {
       }
     }
 
-    navigate(`/playlist/${playlist.id}`);
+    navigate(buildAppPlaylistRoute(playlist.id));
     setIsNowPlayingSidebarOpen(false);
   }, [navigate]);
 
@@ -997,9 +1010,11 @@ function App() {
     <AuthProvider>
       <Router>
         <Routes>
-          <Route path="/playlist/:id" element={<MainLayout />} />
-          <Route path="/" element={<MainLayout />} />
-          <Route path="*" element={<MainLayout />} />
+          <Route path="/" element={<Navigate to={APP_HOME_ROUTE} replace />} />
+          <Route path={LANDING_ROUTE} element={<LandingPage />} />
+          <Route path={APP_PLAYLIST_ROUTE} element={<MainLayout />} />
+          <Route path={APP_HOME_ROUTE} element={<MainLayout />} />
+          <Route path="*" element={<Navigate to={APP_HOME_ROUTE} replace />} />
         </Routes>
       </Router>
     </AuthProvider>

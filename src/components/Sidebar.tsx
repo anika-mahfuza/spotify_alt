@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Music, Plus, Trash2, X } from 'lucide-react';
 import { ImportedPlaylist } from '../types';
+import { APP_HOME_ROUTE, buildAppPlaylistRoute } from '../routes';
 import { ImportPlaylist } from './ImportPlaylist';
 
 interface SidebarProps {
@@ -75,8 +76,8 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     localStorage.setItem('imported_playlists', JSON.stringify(updated));
     setConfirmDelete(null);
 
-    if (location.pathname === `/playlist/${id}`) {
-      navigate('/');
+    if (location.pathname === buildAppPlaylistRoute(id)) {
+      navigate(APP_HOME_ROUTE);
     }
 
     window.dispatchEvent(new CustomEvent('playlist-deleted', { detail: { id } }));
@@ -131,12 +132,12 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
         style={{ height: 'calc(100vh - 6rem)' }}
       >
         <div className="flex items-center justify-between px-4 pb-3 pt-4">
-          <Link to="/" className="flex items-center gap-3 group">
-            <div className="flex h-9 w-9 items-center justify-center rounded-[12px] app-card">
-              <Music size={18} className="text-primary" />
+          <Link to={APP_HOME_ROUTE} className="flex items-center gap-3 group">
+            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-[12px] app-card">
+              <img src="/vite.png" alt="Brokeify logo" className="h-full w-full object-cover" />
             </div>
             <div>
-              <span className="block text-base font-semibold text-text-primary">Music</span>
+              <span className="block text-base font-semibold text-text-primary">Brokeify</span>
               <span className="block text-xs text-text-muted">Album-driven library</span>
             </div>
           </Link>
@@ -151,8 +152,8 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
 
         <nav className="px-3 pb-3">
           <Link
-            to="/"
-            className={`flex items-center gap-3 rounded-[14px] border border-transparent px-3.5 py-2.5 outline-none ring-0 focus:outline-none focus-visible:outline-none active:outline-none ${location.pathname === '/' ? 'app-card-active text-text-primary shadow-[0_18px_40px_rgba(0,0,0,0.22)]' : 'bg-transparent text-text-secondary shadow-none hover:text-text-primary'}`}
+            to={APP_HOME_ROUTE}
+            className={`flex items-center gap-3 rounded-[14px] border border-transparent px-3.5 py-2.5 outline-none ring-0 focus:outline-none focus-visible:outline-none active:outline-none ${location.pathname === APP_HOME_ROUTE ? 'app-card-active text-text-primary shadow-[0_18px_40px_rgba(0,0,0,0.22)]' : 'bg-transparent text-text-secondary shadow-none hover:text-text-primary'}`}
             onPointerUp={(event) => event.currentTarget.blur()}
             onTouchEnd={(event) => event.currentTarget.blur()}
           >
@@ -193,7 +194,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
           ) : (
             <div className="space-y-2">
               {playlists.map(playlist => {
-                const isActive = location.pathname === `/playlist/${playlist.id}`;
+                const isActive = location.pathname === buildAppPlaylistRoute(playlist.id);
 
                 return (
                   <div
@@ -201,7 +202,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                     className={`group flex items-center gap-2.5 rounded-[14px] border border-transparent p-1.5 ${isActive ? 'app-card-active shadow-[0_18px_40px_rgba(0,0,0,0.22)]' : 'bg-transparent shadow-none'}`}
                   >
                     <Link
-                      to={`/playlist/${playlist.id}`}
+                      to={buildAppPlaylistRoute(playlist.id)}
                       className={`flex min-w-0 flex-1 items-center gap-3 rounded-[12px] px-1 py-0.5 outline-none ring-0 focus:outline-none focus-visible:outline-none active:outline-none ${isActive ? 'text-text-primary' : 'text-text-primary hover:text-text-primary'}`}
                       onPointerUp={(event) => event.currentTarget.blur()}
                       onTouchEnd={(event) => event.currentTarget.blur()}
