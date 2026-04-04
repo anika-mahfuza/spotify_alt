@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, Loader2, X } from 'lucide-react';
 import { config } from '../config';
 import { ImportedPlaylist } from '../types';
@@ -68,7 +69,7 @@ export function ImportPlaylist({ onClose, onImported }: ImportPlaylistProps) {
     }
   };
 
-  return (
+  const modal = (
     <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
       <div
         className="app-panel-strong w-full max-w-xl overflow-hidden rounded-[30px]"
@@ -137,4 +138,10 @@ export function ImportPlaylist({ onClose, onImported }: ImportPlaylistProps) {
       </div>
     </div>
   );
+
+  if (typeof document === 'undefined') {
+    return modal;
+  }
+
+  return createPortal(modal, document.body);
 }
