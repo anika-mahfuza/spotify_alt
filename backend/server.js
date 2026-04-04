@@ -784,6 +784,16 @@ function scoreResult(result, query, context = {}) {
   } else if (artistWords.length > 0 && matchedArtistWords === 0) {
     score -= 30;
   }
+  if (qArtist && artist === qArtist) {
+    score += 100;
+  } else if (qArtist && (artist.includes(qArtist) || qArtist.includes(artist))) {
+    score += 45;
+  }
+  if (qArtist && matchedArtistWords === 0 && qTitle && title === qTitle) {
+    score -= 220;
+  } else if (qArtist && matchedArtistWords === 0 && qTitle && title.includes(qTitle)) {
+    score -= 140;
+  }
 
   const heavyPenalties = [
     'nightcore',
@@ -798,15 +808,15 @@ function scoreResult(result, query, context = {}) {
     'capcut',
     'tiktok',
     'mashup',
-    'amv'
+    'amv',
+    'karaoke',
+    'instrumental'
   ];
   const mediumPenalties = [
     'cover',
     'remix',
     'live',
     'reaction',
-    'karaoke',
-    'instrumental',
     'tutorial',
     'lesson',
     '8d audio',
@@ -862,34 +872,55 @@ async function doSearch(q, context = {}) {
   const merged = new Map();
 
   for (const [index, searchQuery] of searchQueries.entries()) {
-    let mapped = [];
+    const resultSets = [];
 
     try {
       const results = await yt.search(searchQuery, { limit: 12, type: 'video', safeSearch: false });
-      mapped = mapResults(results);
+      const mapped = mapResults(results);
+      if (mapped.length) {
+        resultSets.push({ source: 'youtube', items: mapped });
+      }
     } catch (e) {
       console.warn(`[Search] Query failed for "${searchQuery}":`, e.message);
+    }
 
+    try {
+      const mapped = await searchWithInnertube(searchQuery);
+      if (mapped.length) {
+        resultSets.push({ source: 'ytmusic', items: mapped });
+      }
+    } catch (fallbackError) {
+      console.warn(`[Search] YouTube Music search failed for "${searchQuery}":`, fallbackError.message);
+    }
+
+    if (!resultSets.length) {
       try {
-        mapped = await searchWithInnertube(searchQuery);
-      } catch (fallbackError) {
-        console.warn(`[Search] YouTube Music fallback failed for "${searchQuery}":`, fallbackError.message);
-
-        try {
-          mapped = await searchWithPiped(searchQuery);
-        } catch (pipedError) {
-          console.warn(`[Search] Piped fallback failed for "${searchQuery}":`, pipedError.message);
+        const mapped = await searchWithPiped(searchQuery);
+        if (mapped.length) {
+          resultSets.push({ source: 'piped', items: mapped });
         }
+      } catch (pipedError) {
+        console.warn(`[Search] Piped fallback failed for "${searchQuery}":`, pipedError.message);
       }
     }
 
-    const sourceBoost = Math.max(0, 10 - index * 2);
+    const baseSourceBoost = Math.max(0, 10 - index * 2);
 
-    for (const result of mapped) {
-      const mergedScore = scoreResult(result, q, context) + sourceBoost;
-      const existing = merged.get(result.id);
-      if (!existing || mergedScore > existing._score) {
-        merged.set(result.id, { ...result, _score: mergedScore });
+    for (const resultSet of resultSets) {
+      const sourceBoost = baseSourceBoost + (
+        resultSet.source === 'ytmusic'
+          ? 18
+          : resultSet.source === 'piped'
+            ? -4
+            : 0
+      );
+
+      for (const result of resultSet.items) {
+        const mergedScore = scoreResult(result, q, context) + sourceBoost;
+        const existing = merged.get(result.id);
+        if (!existing || mergedScore > existing._score) {
+          merged.set(result.id, { ...result, _score: mergedScore });
+        }
       }
     }
   }
@@ -1492,10 +1523,10 @@ app.get('/api/track-details', async (req, res) => {
 });
 
   app.get('/api/search', async (req, res) => {
-  const { q, title, artist } = req.query;
+  const { q, title, artist, durationMs } = req.query;
   if (!q) return res.status(400).json({ error: 'Query required' });
   try {
-    res.json(await doSearch(q, { title, artist }));
+    res.json(await doSearch(q, { title, artist, durationMs }));
   } catch (e) {
     console.error('Search error:', e.message);
     res.status(500).json({ error: e.message });
@@ -1536,10 +1567,10 @@ app.get('/api/best-match', async (req, res) => {
 });
 
 app.get('/search', async (req, res) => {
-  const { q, title, artist } = req.query;
+  const { q, title, artist, durationMs } = req.query;
   if (!q) return res.status(400).json({ error: 'Query required' });
   try {
-    const results = await doSearch(q, { title, artist });
+    const results = await doSearch(q, { title, artist, durationMs });
     const mapped = results.map(r => ({
       id: r.id,
       title: r.title,

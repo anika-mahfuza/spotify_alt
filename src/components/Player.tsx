@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { SkipBack, SkipForward, Repeat, Shuffle, Volume2, VolumeX, Music } from 'lucide-react';
+import { SkipBack, SkipForward, Repeat, Shuffle, Volume2, VolumeX, Music, Video, VideoOff } from 'lucide-react';
 import { Track } from '../types';
 import { SolidPauseIcon, SolidPlayIcon } from './PlaybackIcons';
 import { backendClient } from '../api/client';
@@ -30,7 +30,7 @@ interface YouTubePlayerStateEvent {
 
 interface YouTubeNamespace {
     Player: new (
-        elementId: string,
+        elementId: string | HTMLElement,
         config: {
             height: string;
             width: string;
@@ -162,6 +162,10 @@ export function Player({
         const saved = localStorage.getItem('player_repeat');
         return saved ? parseInt(saved) : 0;
     });
+    const [showVideo, setShowVideo] = useState(() => {
+        const saved = localStorage.getItem('player_show_video');
+        return saved === 'true';
+    });
 
     const stateRefs = useRef({ isShuffle, repeatMode, onNext });
     useEffect(() => {
@@ -171,6 +175,8 @@ export function Player({
     const [isLargeScreen, setIsLargeScreen] = useState(window.innerWidth >= 1024);
 
     const ytPlayerRef = useRef<YouTubePlayer | null>(null);
+    const ytMountRef = useRef<HTMLDivElement | null>(null);
+    const ytHostRef = useRef<HTMLDivElement | null>(null);
     const ytReadyRef = useRef(false);
     const progressTimerRef = useRef<number | null>(null);
     const currentTrackIdRef = useRef<string | null>(null);
@@ -196,6 +202,7 @@ export function Player({
     useEffect(() => localStorage.setItem('player_volume', volume.toString()), [volume]);
     useEffect(() => localStorage.setItem('player_shuffle', isShuffle.toString()), [isShuffle]);
     useEffect(() => localStorage.setItem('player_repeat', repeatMode.toString()), [repeatMode]);
+    useEffect(() => localStorage.setItem('player_show_video', showVideo.toString()), [showVideo]);
 
     const stopProgressTimer = useCallback(() => {
         if (progressTimerRef.current) {
@@ -395,16 +402,30 @@ export function Player({
         const initPlayer = () => {
             const youTubeApi = window.YT;
             if (ytPlayerRef.current || !youTubeApi?.Player) return;
+            if (!ytMountRef.current) return;
 
-            ytPlayerRef.current = new youTubeApi.Player('yt-player-container', {
-                height: '1',
-                width: '1',
+            if (!ytHostRef.current || !ytMountRef.current.contains(ytHostRef.current)) {
+                ytMountRef.current.innerHTML = '';
+                const host = document.createElement('div');
+                host.style.width = '100%';
+                host.style.height = '100%';
+                ytMountRef.current.appendChild(host);
+                ytHostRef.current = host;
+            }
+
+            ytPlayerRef.current = new youTubeApi.Player(ytHostRef.current, {
+                height: '100%',
+                width: '100%',
                 playerVars: {
                     autoplay: 0,
-                    controls: 0,
-                    disablekb: 1,
+                    controls: 1,
+                    disablekb: 0,
+                    fs: 1,
+                    iv_load_policy: 3,
+                    modestbranding: 1,
                     origin: window.location.origin,
                     playsinline: 1,
+                    rel: 0,
                 },
                 events: {
                     onReady: (event: YouTubePlayerReadyEvent) => {
@@ -502,6 +523,10 @@ export function Player({
                 ytPlayerRef.current.destroy();
                 ytPlayerRef.current = null;
             }
+            if (ytMountRef.current) {
+                ytMountRef.current.innerHTML = '';
+            }
+            ytHostRef.current = null;
         };
     }, [loadIntoPlayer, setIsPlaying, setPlaybackFailure, startProgressTimer, stopProgressTimer, tryCandidateAtIndex]);
 
@@ -628,6 +653,7 @@ export function Player({
 
     const toggleShuffle = () => setIsShuffle(!isShuffle);
     const toggleRepeat = () => setRepeatMode((repeatMode + 1) % 3);
+    const toggleVideoVisibility = () => setShowVideo(value => !value);
 
     const formatTime = (time: number) => {
         if (!time || !isFinite(time)) return '0:00';
@@ -648,10 +674,61 @@ export function Player({
 
     const secondaryControlClass = 'text-text-secondary hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-45 transition-colors';
     const activeControlClass = 'text-primary hover:text-primary-hover disabled:cursor-not-allowed disabled:opacity-45 transition-colors';
+    const videoPanelStyle = showVideo
+        ? {
+            position: 'fixed' as const,
+            bottom: isLargeScreen ? '96px' : 'calc(152px + env(safe-area-inset-bottom))',
+            left: isLargeScreen ? 'auto' : '16px',
+            right: isLargeScreen
+                ? (isSidebarOpen ? `${sidebarWidth + 24}px` : '24px')
+                : '16px',
+            width: isLargeScreen
+                ? (isSidebarOpen
+                    ? `min(520px, calc(100vw - ${sidebarWidth + 72}px))`
+                    : 'min(520px, calc(100vw - 3rem))')
+                : 'calc(100vw - 2rem)',
+            height: isLargeScreen ? '328px' : 'min(42vh, 280px)',
+            zIndex: 95,
+        }
+        : {
+            position: 'fixed' as const,
+            width: 1,
+            height: 1,
+            opacity: 0,
+            pointerEvents: 'none' as const,
+            bottom: 0,
+            right: 0,
+            zIndex: -1,
+        };
 
     return (
         <>
-            <div id="yt-player-container" style={{ position: 'fixed', width: 1, height: 1, opacity: 0, pointerEvents: 'none', bottom: 0, right: 0, zIndex: -1 }} />
+            <div
+                className={`flex flex-col overflow-hidden border border-border/70 bg-black shadow-[0_24px_80px_rgba(0,0,0,0.45)] transition-all duration-300 ${
+                    showVideo
+                        ? 'pointer-events-auto rounded-[24px] opacity-100 translate-y-0'
+                        : 'pointer-events-none rounded-none opacity-0 translate-y-4'
+                }`}
+                style={videoPanelStyle}
+            >
+                {showVideo ? (
+                    <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-black/75 px-4 py-2 text-white">
+                        <div className="min-w-0">
+                            <p className="truncate text-[11px] uppercase tracking-[0.2em] text-white/55">YouTube Video</p>
+                            <p className="truncate text-sm font-medium text-white/90">{currentTrack.name}</p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={toggleVideoVisibility}
+                            className="rounded-full border border-white/12 px-3 py-1 text-xs font-medium text-white/80 transition-colors hover:text-white"
+                            title="Hide video"
+                        >
+                            Hide
+                        </button>
+                    </div>
+                ) : null}
+                <div ref={ytMountRef} className="min-h-0 flex-1 bg-black" />
+            </div>
 
             <div
                 className="
@@ -705,7 +782,7 @@ export function Player({
                         {onToggleNowPlaying ? (
                             <button
                                 onClick={onToggleNowPlaying}
-                                className="app-icon-button flex h-9 w-9 items-center justify-center rounded-full md:hidden"
+                                className="app-icon-button flex h-9 w-9 items-center justify-center rounded-full transition-opacity disabled:cursor-not-allowed disabled:opacity-45 md:hidden"
                                 title="Now Playing"
                                 disabled={isLoading}
                             >
@@ -743,8 +820,16 @@ export function Player({
                                 <Repeat size={18} strokeWidth={2} />
                                 {repeatMode === 2 ? <span className="absolute -top-1 left-1/2 -translate-x-1/2 text-[8px] font-bold">1</span> : null}
                             </button>
+                            <button
+                                onClick={toggleVideoVisibility}
+                                className={showVideo ? activeControlClass : secondaryControlClass}
+                                disabled={isLoading}
+                                title={showVideo ? 'Hide video' : 'Show video'}
+                            >
+                                {showVideo ? <VideoOff size={18} strokeWidth={2} /> : <Video size={18} strokeWidth={2} />}
+                            </button>
                             {onToggleNowPlaying ? (
-                                <button onClick={onToggleNowPlaying} className="hidden md:block text-text-secondary transition-colors hover:text-text-primary" title="Now Playing" disabled={isLoading}>
+                                <button onClick={onToggleNowPlaying} className="hidden text-text-secondary transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-45 md:block" title="Now Playing" disabled={isLoading}>
                                     <Music size={18} strokeWidth={2} />
                                 </button>
                             ) : null}
