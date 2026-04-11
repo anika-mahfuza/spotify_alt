@@ -1,0 +1,16 @@
+# Don't rewrite static files
+/sitemap.xml /sitemap.xml 200
+/robots.txt /robots.txt 200
+/manifest.json /manifest.json 200
+/vite.png /vite.png 200
+/assets/* /assets/:splat 200
+
+# SPA routing for actual app routes
+/home /index.html 200
+/import/* /index.html 200
+/playlist/* /index.html 200
+
+# Root catches everything else
+/* /index.html 200
+
+/* /index.html 200
