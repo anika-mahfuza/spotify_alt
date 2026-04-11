@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "include": ["/home", "/home/*", "/import", "/import/*", "/", "/*"],
+  "exclude": ["/sitemap.xml", "/robots.txt", "/assets/*", "*.css", "*.js", "*.json", "*.xml", "*.txt", "*.png", "*.jpg", "*.jpeg", "*.gif", "*.svg", "*.ico", "*.woff*", "*.ttf", "*.eot"]
+}
