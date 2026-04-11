@@ -13,4 +13,5 @@ export default defineConfig({
   css: {
     postcss: './postcss.config.js',
   },
+  publicDir: 'public',
 })
