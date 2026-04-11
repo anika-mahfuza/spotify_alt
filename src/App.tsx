@@ -684,7 +684,7 @@ function MainLayout() {
   const closeMobileMenu = useCallback(() => setIsMobileMenuOpen(false), []);
 
   useEffect(() => {
-    document.title = 'Brokeify';
+    document.title = 'Brokeify - Free Spotify Alternative Music Player | Import Playlists';
   }, []);
 
   useEffect(() => {
