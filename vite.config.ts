@@ -14,6 +14,7 @@ export default defineConfig({
         '/home',
         '/import',
       ],
+      exclude: ['/google42dcdfc7b03278a2'],
     }),
   ],
   resolve: {
